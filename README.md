@@ -57,28 +57,36 @@ the bot, useful for checking a token/guild pairing.
 Requirements: Node 24.16.0 (`corepack enable`), Docker Desktop.
 
 ```bash
-yarn install                 # installs deps and the git hooks
-cp .env.example .env         # fill in the dev app's token, client id, guild id
-docker compose up --build -d # same file the VPS runs
-docker compose logs -f bot
+yarn install          # installs deps and the git hooks
+cp .env.example .env  # fill in the dev app's token, client id, guild id
+yarn docker:up        # docker compose up --build -d — same file the VPS runs
+yarn docker:logs      # follow the bot's log
 ```
 
 `.env.example` sets `LT_LOAD_ONLY=en,es,fr,de` so LibreTranslate downloads
 only those models (a few hundred MB). Change the list to what you need to
 test; leave it **unset** on the VPS for the full set.
 
-Iterating:
+Compose shortcuts (all in `package.json`):
 
-- `docker compose watch` rebuilds the bot image on changes under `src/`.
+| Script | Runs |
+| --- | --- |
+| `yarn docker:up` | `docker compose up --build -d` |
+| `yarn docker:down` | `docker compose down` (keeps the model and Redis volumes) |
+| `yarn docker:restart` | rebuild and recreate only the bot container |
+| `yarn docker:watch` | rebuild the bot image on changes under `src/` |
+| `yarn docker:logs` / `docker:logs:all` | follow the bot's log / every service |
+| `yarn docker:ps` | container status and health |
+| `yarn docker:cache` | list cached translation keys in Redis |
+| `yarn docker:languages` | the language codes LibreTranslate currently reports |
+
+Other loops:
+
 - `yarn test`, `yarn typecheck`, `yarn lint` — the pre-commit hook runs
   typecheck + lint-staged, the pre-push hook runs the tests.
 - `yarn dev` runs the bot on the host with `tsx watch`; it needs reachable
   `REDIS_URL` / `LT_URL`, which the compose stack deliberately does not
   expose, so the container loop above is the supported path.
-- Inspect the cache: `docker compose exec redis redis-cli --scan --pattern 'tr:*'`.
-
-When done: `docker compose down` (keeps the model and Redis volumes;
-add `-v` to drop them).
 
 ## Deploy (VPS)
 
@@ -135,6 +143,6 @@ it in `.env` locally, or edit the literal in the `.env` heredoc of
 - **"still starting up" replies** — LibreTranslate is downloading or loading
   models; `docker compose ps` shows it `starting` until healthy.
 - **A language is missing from the menus** — the backend does not report
-  it; `docker compose exec bot node -e "fetch('http://libretranslate:5000/languages').then(r=>r.json()).then(console.log)"`.
+  it; check with `yarn docker:languages`.
 - **No response to @mention** — the tagging message must be a *reply*, and
   the Message Content intent must be enabled in the developer portal.

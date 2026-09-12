@@ -15,6 +15,15 @@
     "test": "vitest",
     "test:run": "vitest run",
     "deploy-commands": "tsx --env-file-if-exists=.env scripts/deploy-commands.ts",
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:restart": "docker compose up --build -d --force-recreate bot",
+    "docker:watch": "docker compose watch",
+    "docker:logs": "docker compose logs -f bot",
+    "docker:logs:all": "docker compose logs -f",
+    "docker:ps": "docker compose ps",
+    "docker:cache": "docker compose exec redis redis-cli --scan --pattern 'tr:*'",
+    "docker:languages": "docker compose exec bot node -e \"fetch('http://libretranslate:5000/languages').then(r=>r.json()).then(l=>console.log(l.map(x=>x.code).join(', ')))\"",
     "postinstall": "node .husky/install.mjs"
   },
   "lint-staged": {
