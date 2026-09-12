@@ -15,7 +15,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "deploy-commands": "tsx --env-file-if-exists=.env scripts/deploy-commands.ts",
-    "postinstall": "husky"
+    "postinstall": "node .husky/install.mjs"
   },
   "lint-staged": {
     "*.{ts,mjs}": "eslint --max-warnings 0"

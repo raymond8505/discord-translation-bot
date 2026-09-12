@@ -1,0 +1,81 @@
+# One file for the VPS and for local development. Every difference lives in
+# .env (see .env.example); no override files. Nothing publishes a port: the
+# bot only needs outbound access to Discord, and redis/libretranslate are
+# reachable solely on this project's default network.
+services:
+  bot:
+    build: .
+    container_name: discord-translation-bot
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    # tini forwards SIGTERM to node so `compose stop` triggers the graceful shutdown.
+    init: true
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      # service_started, not healthy: a first start of libretranslate downloads
+      # ~10 GB of models. The bot boots anyway and answers "still starting"
+      # until it is up (src/languages.ts), so a deploy never blocks on it.
+      libretranslate:
+        condition: service_started
+    develop:
+      # `docker compose watch` rebuilds the image on source changes (local loop).
+      watch:
+        - action: rebuild
+          path: ./src
+        - action: rebuild
+          path: package.json
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: discord-translation-bot-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: discord-translation-bot-libretranslate
+    environment:
+      # Empty means "all languages" (LibreTranslate treats "" as unset).
+      # Set LT_LOAD_ONLY in .env locally to limit the model download.
+      LT_LOAD_ONLY: ${LT_LOAD_ONLY:-}
+      LT_DISABLE_WEB_UI: "true"
+      LT_UPDATE_MODELS: "true"
+    volumes:
+      - lt-models:/home/libretranslate/.local:rw
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "./venv/bin/python scripts/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # Covers the first-run model download for the full language set.
+      start_period: 30m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  redis-data:
+  lt-models:
