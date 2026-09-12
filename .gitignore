@@ -1,0 +1,19 @@
+# dependencies
+/node_modules
+.yarn/install-state.gz
+
+# build
+/dist
+*.tsbuildinfo
+
+# testing
+/coverage
+
+# local env files
+.env
+.env*.local
+
+# claude
+.claude/settings.local.json
+.claude/settings.json
+.claude/scratch/*
