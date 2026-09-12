@@ -19,7 +19,7 @@ export type Env = z.infer<typeof envSchema>;
 export type EnvSource = Record<string, string | undefined>;
 
 /**
- * Every variable the bot reads, named explicitly as `process.env.X` so
+ * Every variable the bot reads, each named as a literal property access so
  * `scripts/validate-deploy-env.sh` can grep them and prove the deploy workflow
  * writes each one. Blank values count as unset: an `.env` line left empty gets
  * the schema default or a clear "missing" error, never a coercion failure on "".

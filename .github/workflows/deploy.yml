@@ -1,0 +1,115 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # corepack enable before setup-node so the yarn shim resolves to the
+      # packageManager-pinned Yarn 4 and setup-node's `cache: yarn` detects it.
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.16.0'
+          cache: 'yarn'
+      - run: yarn install --immutable
+      - run: yarn typecheck
+      - run: yarn lint
+      - run: yarn test:run
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate env var deploy sync
+        run: bash scripts/validate-deploy-env.sh
+      - name: Validate Docker build
+        run: docker build .
+      - name: Validate compose file
+        run: |
+          cp .env.example .env
+          docker compose config -q
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          GUILD_ID: ${{ secrets.GUILD_ID }}
+          GH_DEPLOY_KEY: ${{ secrets.GH_DEPLOY_KEY }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DISCORD_TOKEN,DISCORD_CLIENT_ID,GUILD_ID,GH_DEPLOY_KEY
+          script: |
+            set -e
+
+            # Set up deploy key for private repo access
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            printf '%s\n' "${GH_DEPLOY_KEY}" > ~/.ssh/github_discord_translation_bot
+            chmod 600 ~/.ssh/github_discord_translation_bot
+            ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+            export GIT_SSH_COMMAND="ssh -i ~/.ssh/github_discord_translation_bot"
+
+            DEPLOY_PATH="${{ secrets.VPS_DEPLOY_PATH }}"
+            REPO="git@github.com:raymond8505/discord-translation-bot.git"
+
+            if [ -d "${DEPLOY_PATH}/.git" ]; then
+              cd "${DEPLOY_PATH}"
+              git remote set-url origin "${REPO}"
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              git clone "${REPO}" "${DEPLOY_PATH}"
+              cd "${DEPLOY_PATH}"
+            fi
+
+            # Runtime env for docker compose. Service URLs, backend and TTL are
+            # literals: change them here (and in .env.example) to change prod.
+            {
+              echo "DISCORD_TOKEN=${DISCORD_TOKEN}"
+              echo "DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}"
+              echo "GUILD_ID=${GUILD_ID}"
+              echo "REDIS_URL=redis://redis:6379"
+              echo "LT_URL=http://libretranslate:5000"
+              echo "BACKEND=libretranslate"
+              echo "CACHE_TTL_SECONDS=2592000"
+            } > .env
+
+            docker compose up -d --build --remove-orphans
+
+            # The bot reports healthy once its gateway session is up (~30-60s).
+            # libretranslate is deliberately not waited on: its first start
+            # downloads ~10 GB of models and the bot copes until it is ready.
+            echo "Waiting for discord-translation-bot..."
+            for i in $(seq 1 24); do
+              STATUS=$(docker inspect --format '{{.State.Health.Status}}' discord-translation-bot 2>/dev/null || echo "missing")
+              if [ "${STATUS}" = "healthy" ]; then
+                echo "Health check passed!"
+                break
+              fi
+              if [ "$i" = "24" ]; then
+                echo "Health check failed after 120s (status: ${STATUS}) — recent logs:"
+                docker logs --tail 50 discord-translation-bot
+                exit 1
+              fi
+              sleep 5
+            done
+
+            # Clean up dangling images after build
+            docker image prune -f
