@@ -20,6 +20,12 @@ export interface HeartbeatOptions {
   file?: string;
   intervalMs?: number;
   logger?: Logger;
+  /** Writes the file; injectable so timer tests need no real disk I/O. */
+  touch?: (file: string) => Promise<void>;
+}
+
+async function touchFile(file: string): Promise<void> {
+  await writeFile(file, new Date().toISOString());
 }
 
 export interface Heartbeat {
@@ -31,11 +37,12 @@ export interface Heartbeat {
 export function startHeartbeat(source: HeartbeatSource, options: HeartbeatOptions = {}): Heartbeat {
   const file = options.file ?? HEALTH_FILE;
   const logger = options.logger ?? log;
+  const touch = options.touch ?? touchFile;
 
   const beat = async (): Promise<void> => {
     if (!source.isReady()) return;
     try {
-      await writeFile(file, new Date().toISOString());
+      await touch(file);
     } catch (err) {
       logger.error(`could not write health file ${file}`, err);
     }

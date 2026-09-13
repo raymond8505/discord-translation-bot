@@ -34,17 +34,18 @@ describe("startHeartbeat", () => {
 
   it("beats on its interval and stops cleanly", async () => {
     vi.useFakeTimers();
-    const file = join(dir, "healthy");
-    const heartbeat = startHeartbeat({ isReady: () => true }, { file, intervalMs: 1_000 });
+    const touched: string[] = [];
+    const heartbeat = startHeartbeat(
+      { isReady: () => true },
+      { file: "healthy", intervalMs: 1_000, touch: async (file) => void touched.push(file) },
+    );
 
-    await vi.advanceTimersByTimeAsync(1_000);
-    const first = (await stat(file)).mtimeMs;
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(touched).toEqual(["healthy", "healthy"]);
 
     heartbeat.stop();
-    await rm(file);
     await vi.advanceTimersByTimeAsync(5_000);
-    await expect(stat(file)).rejects.toMatchObject({ code: "ENOENT" });
-    expect(first).toBeGreaterThan(0);
+    expect(touched).toHaveLength(2);
   });
 
   it("logs and keeps going when the file cannot be written", async () => {
