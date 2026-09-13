@@ -1,6 +1,5 @@
 import { MessageFlags } from "discord.js";
 import type { AppContext } from "../context.js";
-import { resolveLocale } from "../locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { isMessageSourceId } from "../sourceId.js";
 import { AUTO_SOURCE, translateWithCache } from "../translate.js";
@@ -9,8 +8,6 @@ import { AUTO_VALUE, parseSelectCustomId } from "./customId.js";
 /** The slice of `StringSelectMenuInteraction` the handler touches. */
 export interface LanguageSelectInteraction {
   readonly locale: string;
-  /** The server's language, for source text this clicker did not write. */
-  readonly guildLocale: string | null;
   readonly customId: string;
   readonly values: readonly string[];
   readonly message: { readonly flags: { has(flag: MessageFlags): boolean } };
@@ -63,18 +60,7 @@ export async function handleLanguageSelect(
 
   const supported = await ctx.languages.get();
   const forced = source === AUTO_VALUE ? undefined : source;
-  // A message was written by someone else; `/translate` text belongs to the clicker,
-  // whose reply is ephemeral and so carries menus only they can press.
-  const authorLocale = isMessageSourceId(parsed.sourceId)
-    ? (interaction.guildLocale ?? "")
-    : interaction.locale;
-  const outcome = await translateWithCache(ctx, {
-    sourceId: parsed.sourceId,
-    text,
-    target,
-    source: forced,
-    fallbackSource: resolveLocale(authorLocale, supported) ?? undefined,
-  });
+  const outcome = await translateWithCache(ctx, { sourceId: parsed.sourceId, text, target, source: forced });
   await interaction.editReply(
     buildTranslationReply({ ...outcome, sourceId: parsed.sourceId, source: forced ?? AUTO_SOURCE, supported, tr }),
   );

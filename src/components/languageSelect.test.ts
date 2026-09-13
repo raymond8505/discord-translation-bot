@@ -1,7 +1,6 @@
 import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { sourceKey } from "../cache.js";
-import { makeFakeBackend, unsureTranslate } from "../fixtures/backend.fixture.js";
 import { makeContext } from "../fixtures/context.fixture.js";
 import { MESSAGE_ID, lastReplyDescription, lastReplyPayload, makeSelectInteraction } from "../fixtures/interaction.fixture.js";
 import { frenchMessages } from "../fixtures/messages.fixture.js";
@@ -98,33 +97,6 @@ describe("handleLanguageSelect", () => {
     expect(lastReplyDescription(noChannel)).toMatch(/no longer available/);
 
     expect(ctx.backend.translateCalls).toHaveLength(0);
-  });
-
-  it("falls back to the server's language for a message someone else wrote", async () => {
-    const ctx = makeContext({
-      redis: withSource("ok"),
-      backend: makeFakeBackend({ translate: unsureTranslate(15) }),
-    });
-
-    await handleLanguageSelect(
-      ctx,
-      makeSelectInteraction({ customId: targetMenu, value: "ja", locale: "nl", guildLocale: "de" }),
-    );
-
-    expect(ctx.backend.translateCalls.map((c) => c.source)).toEqual(["auto", "de"]);
-  });
-
-  it("falls back to the clicker's own language for text they typed into /translate", async () => {
-    const textId = sourceIdForText("ok");
-    const ctx = makeContext({
-      redis: makeFakeRedis({ [sourceKey(textId)]: "ok" }),
-      backend: makeFakeBackend({ translate: unsureTranslate(15) }),
-    });
-    const customId = buildSelectCustomId({ role: "target", menuIndex: 0, other: "auto", sourceId: textId });
-
-    await handleLanguageSelect(ctx, makeSelectInteraction({ customId, value: "ja", locale: "nl", guildLocale: "de" }));
-
-    expect(ctx.backend.translateCalls.map((c) => c.source)).toEqual(["auto", "nl"]);
   });
 
   it("words the expiry notice in the clicker's Discord language", async () => {

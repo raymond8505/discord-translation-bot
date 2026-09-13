@@ -1,7 +1,6 @@
 import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { sourceKey, translationKey } from "../cache.js";
-import { makeFakeBackend, unsureTranslate } from "../fixtures/backend.fixture.js";
 import { makeContext } from "../fixtures/context.fixture.js";
 import {
   MESSAGE_ID,
@@ -47,22 +46,6 @@ describe("handleTranslateMessage", () => {
 
     expect(lastReplyDescription(interaction)).toBe("That message has no text to translate.");
     expect(ctx.backend.translateCalls).toHaveLength(0);
-  });
-
-  it("falls back to the server's language, not the clicker's, when detection is a coin flip", async () => {
-    const ctx = makeContext({ backend: makeFakeBackend({ translate: unsureTranslate(15) }) });
-
-    await handleTranslateMessage(ctx, makeMessageContextInteraction({ locale: "ja", guildLocale: "de" }));
-
-    expect(ctx.backend.translateCalls.map((c) => c.source)).toEqual(["auto", "de"]);
-  });
-
-  it("keeps the detection when there is no guild language to fall back to", async () => {
-    const ctx = makeContext({ backend: makeFakeBackend({ translate: unsureTranslate(15) }) });
-
-    await handleTranslateMessage(ctx, makeMessageContextInteraction({ guildLocale: null }));
-
-    expect(ctx.backend.translateCalls.map((c) => c.source)).toEqual(["auto"]);
   });
 
   it("words the notice in the user's Discord language", async () => {

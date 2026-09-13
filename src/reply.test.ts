@@ -60,16 +60,6 @@ describe("buildTranslationReply", () => {
     expect(unsure?.fields?.[0]?.value).toContain("fr:en");
   });
 
-  it("labels an inferred source as an assumption and still offers the correction", () => {
-    const embed = build({
-      entry: makeCacheEntry({ source_lang: "en", source_inferred: true }),
-    }).embeds[0]?.toJSON();
-
-    expect(embed?.footer?.text).toContain("assumed: English");
-    expect(embed?.footer?.text).not.toContain("detected");
-    expect(embed?.fields?.[0]?.name).toMatch(/auto-detect/i);
-  });
-
   it("labels a forced source as given rather than detected", () => {
     const embed = build({ entry: makeCacheEntry({ source_lang: "fr" }) }).embeds[0]?.toJSON();
     expect(embed?.footer?.text).toContain("source: French");

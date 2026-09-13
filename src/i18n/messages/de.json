@@ -14,7 +14,6 @@
   "reply.title": "Übersetzung",
   "reply.source": "Quelle: {language}",
   "reply.detected": "erkannt: {language}",
-  "reply.inferred": "angenommen: {language}",
   "reply.cached": "zwischengespeichert",
   "reply.sameLanguage": "bereits in der Zielsprache",
   "reply.uncertain.name": "Kann Quellsprache nicht automatisch erkennen",

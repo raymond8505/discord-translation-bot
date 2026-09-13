@@ -55,22 +55,7 @@ pattern accepts `xx`, `xxx`, and `xx-Xxxx` forms.
 the cache entry. `src/reply.ts` renders `detected: French (45%)` and, below `LOW_CONFIDENCE_PERCENT`
 (50), adds a "not sure" field telling the user how to force the source. An explicit source stores no
 confidence and renders as `source: French`. Short inputs with proper names are where LibreTranslate
-guesses badly ("j'adore kirsten" → Spanish at 30%, "ok" → English at 15%); it only considers loaded
-languages.
-
-Below `INFER_SOURCE_BELOW_PERCENT` (25, `src/translate.ts`) the score carries no information at all,
-so `translateWithCache` discards the guess and translates again from `fallbackSource` — a second
-backend call on that path only. The entry then stores `source_inferred: true` and no confidence, and
-the reply reads `assumed: English` with the "not sure" field still attached, because an assumption is
-exactly what the user may need to correct. A forced source disables this; so does having no
-`fallbackSource`, or a fallback the detection already agrees with.
-
-**Whose language.** Discord does not expose a message author's client locale to bots (`User` carries
-no `locale`), so each handler passes the closest thing it has: `interaction.locale` where the invoker
-wrote the text themselves (`/translate text:` and the ephemeral menus on its reply), otherwise the
-guild's language (`guildLocale`, or `guild.preferredLocale` on the mention trigger). `resolveLocale()`
-returns null rather than English when the locale names nothing the backend serves, so "no signal"
-stays distinguishable from "English".
+guesses badly ("j'adore kirsten" → Spanish at 45%); it only considers loaded languages.
 
 ## Cache
 

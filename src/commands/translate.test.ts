@@ -1,7 +1,6 @@
 import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { translationKey } from "../cache.js";
-import { makeFakeBackend, unsureTranslate } from "../fixtures/backend.fixture.js";
 import { makeContext } from "../fixtures/context.fixture.js";
 import {
   lastReplyDescription,
@@ -99,15 +98,6 @@ describe("handleTranslate", () => {
 
     expect(lastReplyDescription(interaction)).toBe("Nothing to translate.");
     expect(ctx.backend.translateCalls).toHaveLength(0);
-  });
-
-  it("treats the user's own Discord language as the source when detection is a coin flip", async () => {
-    const ctx = makeContext({ backend: makeFakeBackend({ translate: unsureTranslate(15) }) });
-    const interaction = makeChatInputInteraction({ text: "ok", target: "ja", locale: "de" });
-
-    await handleTranslate(ctx, interaction);
-
-    expect(ctx.backend.translateCalls.map((c) => c.source)).toEqual(["auto", "de"]);
   });
 
   it("speaks the user's Discord language and understands language names in it", async () => {

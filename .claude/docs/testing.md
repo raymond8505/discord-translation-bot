@@ -18,10 +18,10 @@ image.
 | `libretranslate.fixture.ts` | response payloads, `makeJsonResponse()`, `makeFetch()` (records calls), `makeHangingFetch()` (drives the real timeout path) |
 | `redis.fixture.ts` | `makeFakeRedis()` — in-memory `RedisLike`; SCAN yields an empty page first then `COUNT`-sized pages; `del([])` throws |
 | `cache.fixture.ts` | `cacheEntry` / `makeCacheEntry()` |
-| `backend.fixture.ts` | `makeFakeBackend()` — records `translateCalls`, default echo translation `[target] text`; `unsureTranslate(confidence)` detects weakly on `auto` and echoes `[source→target]` on a forced source, for the inference path |
+| `backend.fixture.ts` | `makeFakeBackend()` — records `translateCalls`, default echo translation `[target] text` |
 | `context.fixture.ts` | `makeContext()` — full `AppContext` over the fakes, `makeRecordingLogger()` |
 | `messages.fixture.ts` | `makeMessages()` — the real `en` plus a partial `fr` (`frenchMessages`), `zh-Hans` without `zh-Hant`, and `nb`; `makeContext()` builds its `i18n` from it so handler tests never depend on generated files |
-| `interaction.fixture.ts` | chat-input / autocomplete / context-menu / help / select fakes with a `calls` log, `lastReplyDescription()`; `locale` and `guildLocale` are options wherever the handler reads them |
+| `interaction.fixture.ts` | chat-input / autocomplete / context-menu / help / select fakes with a `calls` log, `lastReplyDescription()`; each takes the `locale` its handler reads |
 | `message.fixture.ts` | `makeMentionMessage()` for the mention trigger |
 
 ## Patterns

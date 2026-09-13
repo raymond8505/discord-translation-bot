@@ -75,8 +75,6 @@ export interface MessageContextOptions {
   id?: string;
   content?: string;
   locale?: string;
-  /** `null` models an interaction outside a guild. */
-  guildLocale?: string | null;
 }
 
 export function makeMessageContextInteraction(
@@ -86,7 +84,6 @@ export function makeMessageContextInteraction(
   return {
     calls,
     locale: options.locale ?? "fr",
-    guildLocale: options.guildLocale === undefined ? "en-US" : options.guildLocale,
     targetMessage: { id: options.id ?? MESSAGE_ID, content: options.content ?? SPANISH_TEXT },
     async deferReply(payload) {
       calls.push({ method: "deferReply", payload });
@@ -107,8 +104,6 @@ export interface SelectOptions {
   /** `channel: null` models an interaction with no channel to fetch from. */
   withoutChannel?: boolean;
   locale?: string;
-  /** `null` models an interaction outside a guild. */
-  guildLocale?: string | null;
 }
 
 export function makeSelectInteraction(options: SelectOptions): LanguageSelectInteraction & ResponseLog {
@@ -117,7 +112,6 @@ export function makeSelectInteraction(options: SelectOptions): LanguageSelectInt
   return {
     calls,
     locale: options.locale ?? "en-US",
-    guildLocale: options.guildLocale === undefined ? "en-US" : options.guildLocale,
     customId: options.customId,
     values: options.value === undefined ? ["fr"] : [options.value],
     message: {

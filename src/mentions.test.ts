@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BackendError } from "./backends/index.js";
-import { makeFakeBackend, unsureTranslate } from "./fixtures/backend.fixture.js";
+import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { makeContext } from "./fixtures/context.fixture.js";
 import { MESSAGE_ID, SPANISH_TEXT, lastReplyDescription, lastReplyPayload } from "./fixtures/interaction.fixture.js";
 import { BOT_USER_ID, makeMentionMessage } from "./fixtures/message.fixture.js";
@@ -56,17 +56,6 @@ describe("handleMentionMessage", () => {
     expect(lastReplyDescription(chatty)).toBe(`[en] ${SPANISH_TEXT}`);
 
     expect(ctx.backend.translateCalls).toHaveLength(1);
-  });
-
-  it("treats the server's language as the source when the parent message defeats detection", async () => {
-    const ctx = makeContext({ backend: makeFakeBackend({ translate: unsureTranslate(15) }) });
-
-    await handleMentionMessage(ctx, makeMentionMessage({ content: `<@${BOT_USER_ID}> :ja`, preferredLocale: "de" }));
-
-    expect(ctx.backend.translateCalls.map((c) => [c.source, c.target])).toEqual([
-      ["auto", "ja"],
-      ["de", "ja"],
-    ]);
   });
 
   it("does nothing for bot authors, non-mentions, or before the client is ready", async () => {

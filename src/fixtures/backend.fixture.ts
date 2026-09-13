@@ -1,5 +1,4 @@
 import type { TranslateResult, TranslationBackend } from "../backends/index.js";
-import { AUTO_SOURCE } from "../translate.js";
 import { libreLanguageCodes } from "./languages.fixture.js";
 
 export interface TranslateCall {
@@ -22,21 +21,6 @@ export interface FakeBackendOptions {
 /** Default translation: tags the text with the target so tests can see it round-trip. */
 export async function echoTranslate(text: string, _source: string, target: string): Promise<TranslateResult> {
   return { text: `[${target}] ${text}`, detectedSource: "es" };
-}
-
-/**
- * Detects `detected` with `confidence` when asked to auto-detect, and honours a
- * forced source otherwise, so a test can drive the low-confidence inference path
- * and tell the two backend calls apart by their text.
- */
-export function unsureTranslate(
-  confidence: number,
-  detected = "es",
-): FakeBackendOptions["translate"] {
-  return async (text, source, target) =>
-    source === AUTO_SOURCE
-      ? { text: `[${target}] ${text}`, detectedSource: detected, confidence }
-      : { text: `[${source}→${target}] ${text}`, detectedSource: source };
 }
 
 export function makeFakeBackend(options: FakeBackendOptions = {}): FakeBackend {
