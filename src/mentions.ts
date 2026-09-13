@@ -4,7 +4,7 @@ import { isOperational, userMessageFor } from "./errors.js";
 import { parseLanguageSpec, resolveTarget } from "./locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "./reply.js";
 import { sourceIdForMessage } from "./sourceId.js";
-import { translateWithCache } from "./translate.js";
+import { AUTO_SOURCE, translateWithCache } from "./translate.js";
 
 /** The slice of `Message` the mention trigger touches. */
 export interface MentionMessage {
@@ -89,7 +89,10 @@ async function translateParent(ctx: AppContext, message: MentionMessage): Promis
     target,
     source: spec.source ?? undefined,
   });
-  await replyQuietly(message, buildTranslationReply({ ...outcome, sourceId, supported }));
+  await replyQuietly(
+    message,
+    buildTranslationReply({ ...outcome, sourceId, source: spec.source ?? AUTO_SOURCE, supported }),
+  );
 }
 
 /** Replies without pinging the author again; they just posted and are watching. */

@@ -1,20 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { buildSelectCustomId, isSelectCustomId, parseSelectCustomId } from "./customId.js";
+import { buildSelectCustomId, isSelectCustomId, parseSelectCustomId, type SelectCustomId } from "./customId.js";
 
 describe("select customId", () => {
-  it("round-trips a message id and a text hash id", () => {
-    for (const sourceId of ["123456789012345678", "t_0123456789abcdef"]) {
-      const id = buildSelectCustomId(1, sourceId);
-      expect(id.length).toBeLessThanOrEqual(100);
-      expect(isSelectCustomId(id)).toBe(true);
-      expect(parseSelectCustomId(id)).toEqual({ menuIndex: 1, sourceId });
-    }
+  it.each<SelectCustomId>([
+    { role: "target", menuIndex: 1, other: "auto", sourceId: "123456789012345678" },
+    { role: "source", menuIndex: 0, other: "en", sourceId: "t_0123456789abcdef" },
+    { role: "target", menuIndex: 0, other: "zt", sourceId: "123456789012345678" },
+  ])("round-trips %j", (id) => {
+    const customId = buildSelectCustomId(id);
+    expect(customId.length).toBeLessThanOrEqual(100);
+    expect(isSelectCustomId(customId)).toBe(true);
+    expect(parseSelectCustomId(customId)).toEqual(id);
   });
 
   it("rejects ids it did not build", () => {
-    expect(parseSelectCustomId("lang:x:123")).toBeNull();
-    expect(parseSelectCustomId("other:0:123")).toBeNull();
-    expect(parseSelectCustomId("lang:0:has space")).toBeNull();
-    expect(isSelectCustomId("other:0:123")).toBe(false);
+    expect(parseSelectCustomId("lang:x:0:auto:123")).toBeNull();
+    expect(parseSelectCustomId("lang:t:0:123")).toBeNull();
+    expect(parseSelectCustomId("lang:t:0:FR:123")).toBeNull();
+    expect(parseSelectCustomId("other:t:0:auto:123")).toBeNull();
+    expect(parseSelectCustomId("lang:t:0:auto:has space")).toBeNull();
+    expect(isSelectCustomId("other:t:0:auto:123")).toBe(false);
   });
 });

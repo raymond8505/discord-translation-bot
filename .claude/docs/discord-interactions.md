@@ -26,7 +26,8 @@ Add a new command by exporting its builder from `src/commands/`, appending it to
   assignable at the router; tests pass fakes from `src/fixtures/interaction.fixture.ts` and
   `message.fixture.ts`.
 - **Limits enforced in `src/reply.ts`**: embed description ≤ 4096 (truncated with `…`), ≤ 25 options
-  per select menu, at most 2 menus. Input text is capped at 4000 chars in `src/translate.ts`.
+  per select menu, at most 2 menus per role (4 rows). Input text is capped at 4000 chars in
+  `src/translate.ts`.
 
 ## Mention trigger
 
@@ -42,12 +43,19 @@ name. Replies use `allowedMentions: { repliedUser: false }`.
 (autocompleted) forces the source. A forced source bypasses the cache read and overwrites the entry
 (`src/translate.ts`), so it corrects a wrong detection for everyone.
 
-## customId scheme
+## Menus and the customId scheme
 
-`lang:<menuIndex>:<sourceId>` (`src/components/customId.ts`), ≤ 100 chars. `sourceId` is the
-message snowflake or `t_<16 hex>` for `/translate text:` (`src/sourceId.ts`). The select handler
-recovers the text from `src:{sourceId}` in Redis, then by `channel.messages.fetch(id)` for
-snowflakes, else reports expiry. Never put text in a customId.
+Every translation reply carries up to four select rows: two **source** menus (Auto-detect first,
+then the languages, preselecting what was detected or forced) and two **target** menus (preselecting
+the current target). Two per role because the Discord-locale list (~29) exceeds the 25-option cap;
+Discord allows five rows per message, so there is room for exactly this.
+
+customIds are `lang:<s|t>:<menuIndex>:<other>:<sourceId>` (`src/components/customId.ts`), ≤ 100
+chars. `other` is the counterpart's current value (a code or `auto`) so a source pick keeps the
+target and a target pick keeps a forced source. `sourceId` is the message snowflake or `t_<16 hex>`
+for `/translate text:` (`src/sourceId.ts`). The select handler recovers the text from
+`src:{sourceId}` in Redis, then by `channel.messages.fetch(id)` for snowflakes, else reports
+expiry. Never put text in a customId.
 
 ## Intents and partials
 

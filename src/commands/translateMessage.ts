@@ -3,7 +3,7 @@ import type { AppContext } from "../context.js";
 import { resolveTarget } from "../locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForMessage } from "../sourceId.js";
-import { translateWithCache } from "../translate.js";
+import { AUTO_SOURCE, translateWithCache } from "../translate.js";
 
 export const TRANSLATE_MESSAGE_COMMAND_NAME = "Translate Message";
 
@@ -35,5 +35,5 @@ export async function handleTranslateMessage(
   const target = resolveTarget(interaction.locale, supported);
   const sourceId = sourceIdForMessage(id);
   const outcome = await translateWithCache(ctx, { sourceId, text: content, target });
-  await interaction.editReply(buildTranslationReply({ ...outcome, sourceId, supported }));
+  await interaction.editReply(buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported }));
 }

@@ -7,7 +7,7 @@ import type { AppContext } from "../context.js";
 import { menuLanguages, parseLanguageHint, parseLanguageSpec, resolveTarget } from "../locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForText } from "../sourceId.js";
-import { MAX_INPUT_CHARS, translateWithCache } from "../translate.js";
+import { AUTO_SOURCE, MAX_INPUT_CHARS, translateWithCache } from "../translate.js";
 
 export const TRANSLATE_COMMAND_NAME = "translate";
 const TEXT_OPTION = "text";
@@ -83,7 +83,9 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
   const target = spec.target ?? resolveTarget(interaction.locale, supported);
   const sourceId = sourceIdForText(text);
   const outcome = await translateWithCache(ctx, { sourceId, text, target, source: source ?? undefined });
-  await interaction.editReply(buildTranslationReply({ ...outcome, sourceId, supported }));
+  await interaction.editReply(
+    buildTranslationReply({ ...outcome, sourceId, source: source ?? AUTO_SOURCE, supported }),
+  );
 }
 
 export interface TranslateAutocompleteInteraction {

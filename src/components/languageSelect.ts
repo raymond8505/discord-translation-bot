@@ -2,8 +2,8 @@ import { MessageFlags } from "discord.js";
 import type { AppContext } from "../context.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { isMessageSourceId } from "../sourceId.js";
-import { translateWithCache } from "../translate.js";
-import { parseSelectCustomId } from "./customId.js";
+import { AUTO_SOURCE, translateWithCache } from "../translate.js";
+import { AUTO_VALUE, parseSelectCustomId } from "./customId.js";
 
 /** The slice of `StringSelectMenuInteraction` the handler touches. */
 export interface LanguageSelectInteraction {
@@ -21,9 +21,11 @@ export interface LanguageSelectInteraction {
 const EXPIRED = "The original text is no longer available to translate.";
 
 /**
- * Re-translates into the chosen language. A menu on an ephemeral reply edits
- * that reply in place; a menu on a public reply (the mention trigger) answers
- * the clicker with a fresh ephemeral message so the public post stays as is.
+ * Re-translates after a menu pick. A source menu forces (or un-forces) the
+ * source and keeps the target; a target menu keeps the source. A menu on an
+ * ephemeral reply edits that reply in place; a menu on a public reply (the
+ * mention trigger) answers the clicker with a fresh ephemeral message so the
+ * public post stays as is.
  */
 export async function handleLanguageSelect(
   ctx: AppContext,
@@ -42,11 +44,13 @@ export async function handleLanguageSelect(
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   }
 
-  const target = interaction.values[0];
-  if (!target) {
+  const picked = interaction.values[0];
+  if (!picked) {
     await interaction.editReply(buildNoticeReply("No language selected."));
     return;
   }
+  const source = parsed.role === "source" ? picked : parsed.other;
+  const target = parsed.role === "target" ? picked : parsed.other;
 
   const text = await resolveSourceText(ctx, interaction, parsed.sourceId);
   if (text === null) {
@@ -55,8 +59,11 @@ export async function handleLanguageSelect(
   }
 
   const supported = await ctx.languages.get();
-  const outcome = await translateWithCache(ctx, { sourceId: parsed.sourceId, text, target });
-  await interaction.editReply(buildTranslationReply({ ...outcome, sourceId: parsed.sourceId, supported }));
+  const forced = source === AUTO_VALUE ? undefined : source;
+  const outcome = await translateWithCache(ctx, { sourceId: parsed.sourceId, text, target, source: forced });
+  await interaction.editReply(
+    buildTranslationReply({ ...outcome, sourceId: parsed.sourceId, source: forced ?? AUTO_SOURCE, supported }),
+  );
 }
 
 async function resolveSourceText(

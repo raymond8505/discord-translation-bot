@@ -59,7 +59,7 @@ describe("createInteractionHandler", () => {
     const context = makeMessageContextInteraction();
     // "de" so the select misses the cache the context command just filled for "fr".
     const select = makeSelectInteraction({
-      customId: buildSelectCustomId(0, MESSAGE_ID),
+      customId: buildSelectCustomId({ role: "target", menuIndex: 0, other: "auto", sourceId: MESSAGE_ID }),
       value: "de",
       channelMessage: { content: "hola" },
     });

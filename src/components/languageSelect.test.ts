@@ -2,29 +2,34 @@ import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { sourceKey } from "../cache.js";
 import { makeContext } from "../fixtures/context.fixture.js";
-import { MESSAGE_ID, lastReplyDescription, makeSelectInteraction } from "../fixtures/interaction.fixture.js";
+import { MESSAGE_ID, lastReplyDescription, lastReplyPayload, makeSelectInteraction } from "../fixtures/interaction.fixture.js";
 import { makeFakeRedis } from "../fixtures/redis.fixture.js";
 import { sourceIdForText } from "../sourceId.js";
-import { buildSelectCustomId } from "./customId.js";
+import { buildSelectCustomId, parseSelectCustomId } from "./customId.js";
 import { handleLanguageSelect } from "./languageSelect.js";
 
-const customId = buildSelectCustomId(0, MESSAGE_ID);
+const targetMenu = buildSelectCustomId({ role: "target", menuIndex: 0, other: "auto", sourceId: MESSAGE_ID });
+const sourceMenu = buildSelectCustomId({ role: "source", menuIndex: 0, other: "en", sourceId: MESSAGE_ID });
+
+function withSource(text: string) {
+  return makeFakeRedis({ [sourceKey(MESSAGE_ID)]: text });
+}
 
 describe("handleLanguageSelect", () => {
-  it("edits an ephemeral reply in place", async () => {
-    const ctx = makeContext({ redis: makeFakeRedis({ [sourceKey(MESSAGE_ID)]: "hola" }) });
-    const interaction = makeSelectInteraction({ customId, value: "de", onEphemeral: true });
+  it("edits an ephemeral reply in place when a target is picked", async () => {
+    const ctx = makeContext({ redis: withSource("hola") });
+    const interaction = makeSelectInteraction({ customId: targetMenu, value: "de", onEphemeral: true });
 
     await handleLanguageSelect(ctx, interaction);
 
     expect(interaction.calls[0]).toEqual({ method: "deferUpdate" });
     expect(lastReplyDescription(interaction)).toBe("[de] hola");
-    expect(ctx.backend.translateCalls[0]?.target).toBe("de");
+    expect(ctx.backend.translateCalls).toEqual([{ text: "hola", source: "auto", target: "de" }]);
   });
 
   it("answers a menu on a public reply with a fresh ephemeral message", async () => {
-    const ctx = makeContext({ redis: makeFakeRedis({ [sourceKey(MESSAGE_ID)]: "hola" }) });
-    const interaction = makeSelectInteraction({ customId, value: "de", onEphemeral: false });
+    const ctx = makeContext({ redis: withSource("hola") });
+    const interaction = makeSelectInteraction({ customId: targetMenu, value: "de", onEphemeral: false });
 
     await handleLanguageSelect(ctx, interaction);
 
@@ -32,9 +37,39 @@ describe("handleLanguageSelect", () => {
     expect(lastReplyDescription(interaction)).toBe("[de] hola");
   });
 
+  it("forces the source from a source menu and keeps the target", async () => {
+    const ctx = makeContext({ redis: withSource("j'adore") });
+    const interaction = makeSelectInteraction({ customId: sourceMenu, value: "fr" });
+
+    await handleLanguageSelect(ctx, interaction);
+
+    expect(ctx.backend.translateCalls).toEqual([{ text: "j'adore", source: "fr", target: "en" }]);
+    // The new reply's target menus now carry the forced source.
+    const ids = lastReplyPayload(interaction)?.components.map((row) => parseSelectCustomId(row.toJSON().components[0]?.custom_id ?? ""));
+    expect(ids?.filter((id) => id?.role === "target").every((id) => id?.other === "fr")).toBe(true);
+  });
+
+  it("returns to auto-detection when the source menu's Auto option is picked", async () => {
+    const ctx = makeContext({ redis: withSource("hola") });
+    const interaction = makeSelectInteraction({ customId: sourceMenu, value: "auto" });
+
+    await handleLanguageSelect(ctx, interaction);
+
+    expect(ctx.backend.translateCalls).toEqual([{ text: "hola", source: "auto", target: "en" }]);
+  });
+
+  it("keeps a forced source when a target is picked afterwards", async () => {
+    const ctx = makeContext({ redis: withSource("j'adore") });
+    const forcedTarget = buildSelectCustomId({ role: "target", menuIndex: 0, other: "fr", sourceId: MESSAGE_ID });
+
+    await handleLanguageSelect(ctx, makeSelectInteraction({ customId: forcedTarget, value: "de" }));
+
+    expect(ctx.backend.translateCalls).toEqual([{ text: "j'adore", source: "fr", target: "de" }]);
+  });
+
   it("re-fetches the message when the stored source has expired", async () => {
     const ctx = makeContext();
-    const interaction = makeSelectInteraction({ customId, channelMessage: { content: "buenos días" } });
+    const interaction = makeSelectInteraction({ customId: targetMenu, channelMessage: { content: "buenos días" } });
 
     await handleLanguageSelect(ctx, interaction);
 
@@ -45,16 +80,18 @@ describe("handleLanguageSelect", () => {
   it("reports expiry when the source is gone and cannot be re-fetched", async () => {
     const ctx = makeContext();
 
-    const deleted = makeSelectInteraction({ customId, channelMessage: null });
+    const deleted = makeSelectInteraction({ customId: targetMenu, channelMessage: null });
     await handleLanguageSelect(ctx, deleted);
     expect(lastReplyDescription(deleted)).toMatch(/no longer available/);
 
-    const freeText = makeSelectInteraction({ customId: buildSelectCustomId(0, sourceIdForText("x")) });
+    const freeText = makeSelectInteraction({
+      customId: buildSelectCustomId({ role: "target", menuIndex: 0, other: "auto", sourceId: sourceIdForText("x") }),
+    });
     await handleLanguageSelect(ctx, freeText);
     expect(lastReplyDescription(freeText)).toMatch(/no longer available/);
     expect(freeText.calls.some((c) => c.method === "fetch")).toBe(false);
 
-    const noChannel = makeSelectInteraction({ customId, withoutChannel: true });
+    const noChannel = makeSelectInteraction({ customId: targetMenu, withoutChannel: true });
     await handleLanguageSelect(ctx, noChannel);
     expect(lastReplyDescription(noChannel)).toMatch(/no longer available/);
 
@@ -67,7 +104,7 @@ describe("handleLanguageSelect", () => {
       throw new Error("ECONNREFUSED");
     };
     const ctx = makeContext({ redis });
-    const interaction = makeSelectInteraction({ customId, channelMessage: { content: "hola" } });
+    const interaction = makeSelectInteraction({ customId: targetMenu, channelMessage: { content: "hola" } });
 
     await handleLanguageSelect(ctx, interaction);
 

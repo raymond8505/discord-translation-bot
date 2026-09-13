@@ -8,7 +8,7 @@ LibreTranslate (Argos models, entirely local, no third-party API).
 
 | Trigger | How | Reply |
 | --- | --- | --- |
-| Reply to a message and `@mention` the bot | `@bot`, `@bot french`, `@bot fr:en` | Public reply with the translation and two language menus |
+| Reply to a message and `@mention` the bot | `@bot`, `@bot french`, `@bot fr:en` | Public reply with the translation and source/target menus |
 | Right-click a message → Apps → **Translate Message** | context menu | Ephemeral (only you see it) |
 | `/translate text:<text> [target] [source]` | slash command, both language options autocomplete | Ephemeral |
 
@@ -18,9 +18,11 @@ LibreTranslate (Argos models, entirely local, no third-party API).
   confidence. Below 50% the reply says so and how to force it: `@bot fr:en`
   (source:target), `@bot fr:` (source only), or `/translate` with `source:`.
   A forced source also replaces the cached translation for everyone.
-- Every reply carries **two select menus** to re-translate into another
-  language. On a public reply the menu answers you privately; on an
-  ephemeral reply it edits in place.
+- Every reply carries **source and target menus** (two rows each): the
+  source menus show what was detected and let you correct it (or go back to
+  Auto-detect); the target menus re-translate into another language. On a
+  public reply a menu answers you privately; on an ephemeral reply it edits
+  in place.
 - Any supported language to any other (Argos pivots through English
   internally). The language menus and autocomplete follow what LibreTranslate
   reports, re-checked every 5 minutes.
