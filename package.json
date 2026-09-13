@@ -15,6 +15,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "deploy-commands": "tsx --env-file-if-exists=.env scripts/deploy-commands.ts",
+    "locales:generate": "tsx scripts/generate-locales.ts",
     "docker:up": "docker compose up --build -d",
     "docker:down": "docker compose down",
     "docker:restart": "docker compose up --build -d --force-recreate bot",

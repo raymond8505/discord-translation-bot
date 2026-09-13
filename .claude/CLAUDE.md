@@ -26,9 +26,13 @@ arrays. `tsconfig.build.json` excludes them from the image.
 
 **Redis: `SCAN`, never `KEYS`; guard empty `DEL`s** — the fake in `redis.fixture.ts` enforces both.
 
+**No user-facing string literals in `src/`**: every reply, embed, placeholder and command description
+is a key in `src/i18n/messages/en.json` rendered through a `Translator` (`ctx.i18n.forLocale(...)`).
+
 ## Read the doc when the trigger fires
 
 - **Touching `deploy.yml`, `docker-compose.yml`, the `Dockerfile`, or adding an env var** → [docs/deployment.md](docs/deployment.md)
 - **Adding or changing a command, the mention trigger, a select menu, or a customId** → [docs/discord-interactions.md](docs/discord-interactions.md)
 - **Working on a backend, `src/locale.ts`, the cache keys, or invalidation** → [docs/translation.md](docs/translation.md)
+- **Adding or rewording a message, touching `src/i18n/`, or running `yarn locales:generate`** → [docs/i18n.md](docs/i18n.md)
 - **Writing or changing a test or fixture** → [docs/testing.md](docs/testing.md)

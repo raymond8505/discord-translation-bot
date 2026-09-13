@@ -29,6 +29,8 @@ Add a new command by exporting its builder from `src/commands/`, appending it to
 - **Limits enforced in `src/reply.ts`**: embed description ≤ 4096 (truncated with `…`), ≤ 25 options
   per select menu, at most 2 menus per role (4 rows). Input text is capped at 4000 chars in
   `src/translate.ts`.
+- **Every string goes through `ctx.i18n.forLocale(interaction.locale)`** (guild locale on the mention
+  trigger); language names and hint parsing take `tr.language`. See [i18n.md](i18n.md).
 
 ## Mention trigger
 

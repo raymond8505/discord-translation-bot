@@ -29,6 +29,9 @@ LibreTranslate (Argos models, entirely local, no third-party API).
   reports, re-checked every 5 minutes.
 - Translations are cached in Redis for 30 days per message and target; an
   edit or delete of the source message drops its cache entries.
+- The bot's own replies, menus and command descriptions follow your Discord
+  client language (the server's preferred locale on the mention trigger),
+  with language names from ICU. See [Localization](#localization).
 
 ## Architecture
 
@@ -88,6 +91,7 @@ Compose shortcuts (all in `package.json`):
 | `yarn docker:ps` | container status and health |
 | `yarn docker:cache` | list cached translation keys in Redis |
 | `yarn docker:languages` | the language codes LibreTranslate currently reports |
+| `yarn locales:generate` | fill the bot's message files for every language LibreTranslate serves (see [Localization](#localization)) |
 
 Other loops:
 
@@ -137,6 +141,27 @@ up; `docker compose ps` shows the status.
 Cache entries record the backend that produced them, so old hits remain
 identifiable after a swap; drop them with `redis-cli --scan --pattern 'tr:*'`
 piped to `DEL` if the new backend should retranslate everything.
+
+## Localization
+
+`src/i18n/messages/en.json` holds every message the bot sends; the other
+`<code>.json` files next to it are produced by LibreTranslate and committed.
+
+```bash
+yarn locales:generate              # fill missing keys/files for every language the stack serves
+yarn locales:generate --force      # retranslate everything
+yarn locales:generate --only fr,de # just these codes
+yarn locales:generate --check      # no docker: list files missing keys, exit 1 if any
+```
+
+The script talks to LibreTranslate through the running bot container, so
+`yarn docker:up` first. With `LT_LOAD_ONLY` set locally only those languages
+are generated; the full set needs every model loaded (unset it, or run on the
+VPS). Placeholders like `{name}` and code spans are shielded from the
+translator; a string the model still mangled is kept in English and named in
+the summary so you can edit the file by hand. Hand edits survive later runs,
+which only fill keys that are missing. Language *names* are not in these
+files: they come from Node's ICU data in the reader's language.
 
 ## Adjusting the cache TTL
 
