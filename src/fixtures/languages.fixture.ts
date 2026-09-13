@@ -1,7 +1,8 @@
 /**
  * Language codes as a LibreTranslate `/languages` call reports them. A
  * realistic subset: includes the alt codes (`zt`, `nb`, `pb`) and omits
- * Croatian (`hr`) and Lithuanian (`lt`), which Argos lacks.
+ * Croatian (`hr`, which Argos has no model for) and Lithuanian (`lt`, an
+ * available model this install simply hasn't loaded).
  */
 export const libreLanguageCodes: readonly string[] = [
   "en", "ar", "bg", "cs", "da", "de", "el", "es", "fi", "fr", "hi", "hu",

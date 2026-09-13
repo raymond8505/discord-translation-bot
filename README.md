@@ -151,6 +151,9 @@ it in `.env` locally, or edit the literal in the `.env` heredoc of
 - **"still starting up" replies** — LibreTranslate is downloading or loading
   models; `docker compose ps` shows it `starting` until healthy.
 - **A language is missing from the menus** — the backend does not report
-  it; check with `yarn docker:languages`.
+  it; check with `yarn docker:languages`. Locally that usually means it is
+  not in `LT_LOAD_ONLY`; Argos has no Croatian model at all. Valid codes are
+  the `from_code`/`to_code` values in the
+  [Argos model index](https://raw.githubusercontent.com/argosopentech/argospm-index/main/index.json).
 - **No response to @mention** — the tagging message must be a *reply*, and
   the Message Content intent must be enabled in the developer portal.
