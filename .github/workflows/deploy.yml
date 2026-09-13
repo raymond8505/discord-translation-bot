@@ -37,6 +37,11 @@ jobs:
         run: |
           cp .env.example .env
           docker compose config -q
+      # .env.example gives every var a value, so the step above only ever
+      # exercises the populated path. This one renders the .env the deploy
+      # actually writes, where the difference between unset and blank bites.
+      - name: Validate compose env under production conditions
+        run: bash scripts/validate-compose-env.sh
 
   deploy:
     runs-on: ubuntu-latest

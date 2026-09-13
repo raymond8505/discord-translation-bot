@@ -6,9 +6,15 @@
 difference is an `.env` value; there is no `docker-compose.override.yml` and none should be added
 (it would auto-merge into the production `compose up`).
 
-- `LT_LOAD_ONLY` is interpolated into the libretranslate service as `${LT_LOAD_ONLY:-}`. Set locally
-  to limit the model download; **unset on the VPS** (the deploy heredoc does not write it) so all
-  languages load. LibreTranslate treats an empty value as unset.
+- `LT_LOAD_ONLY` is a **key-only** entry on the libretranslate service (`LT_LOAD_ONLY:`, no value).
+  Compose renders that as null and omits the variable, while still taking a value from `.env` when
+  one is set. Set it locally to limit the model download; on the VPS the deploy heredoc does not
+  write it, so it is absent and all languages load. Never give it a `${LT_LOAD_ONLY:-}` default:
+  that renders a blank string, LibreTranslate reads a blank as "load these zero languages", and
+  `create_app` dies on `languages[0]` of an empty list — a gunicorn crash loop that `docker compose
+  ps` reports as `health: starting` for the full 30-minute `start_period`, so diagnose it with
+  `logs`, not `ps`. `scripts/validate-compose-env.sh` fails the build if any container env var
+  renders set-but-empty.
 - No service publishes a port. Redis and LibreTranslate are reachable only on the project network.
   For host-side inspection use `docker compose exec` (e.g. `redis-cli`) or run a one-off container
   on `discord-translation-bot_default`.
@@ -23,6 +29,10 @@ difference is an `.env` value; there is no `docker-compose.override.yml` and non
 4. `bash scripts/validate-deploy-env.sh` must pass — it greps `process.env.X` in `src/` (excluding
    tests and fixtures) and checks the three workflow locations. Never write `process.env.X` in a
    comment; the grep will match it.
+5. `bash scripts/validate-compose-env.sh` must pass — it renders the compose file against the .env
+   the heredoc writes and rejects any container env var that comes out set-but-empty. A var a
+   service is meant to do without belongs in `environment:` as a key-only entry, not as
+   `${VAR:-}`.
 
 `env_file: .env` forwards every var to the bot, so `docker-compose.yml` needs no change.
 

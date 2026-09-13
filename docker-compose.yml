@@ -55,9 +55,13 @@ services:
     image: libretranslate/libretranslate:latest
     container_name: discord-translation-bot-libretranslate
     environment:
-      # Empty means "all languages" (LibreTranslate treats "" as unset).
+      # Key-only on purpose. Compose renders a key with no value as null and
+      # omits the variable, which is how LibreTranslate is asked for every
+      # language; it still picks the value up from .env when one is set there.
+      # An empty string is NOT equivalent: LibreTranslate reads it as "load
+      # these zero languages", then dies on `languages[0]` of an empty list.
       # Set LT_LOAD_ONLY in .env locally to limit the model download.
-      LT_LOAD_ONLY: ${LT_LOAD_ONLY:-}
+      LT_LOAD_ONLY:
       LT_DISABLE_WEB_UI: "true"
       LT_UPDATE_MODELS: "true"
     volumes:
