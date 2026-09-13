@@ -91,11 +91,11 @@ function defForLocale(locale: string): LanguageDef | undefined {
 }
 
 /**
- * Picks the backend code to translate into for a Discord locale. Falls back
- * to the bare language prefix (`de-CH` → `de`) and finally to English, so a
- * locale the table doesn't know still yields something translatable.
+ * The backend code a Discord locale names, falling back to the bare language
+ * prefix (`de-CH` → `de`). Null when neither names a language the backend
+ * serves, for callers that need to know they learned nothing.
  */
-export function resolveTarget(locale: string, supported: ReadonlySet<string>): string {
+export function resolveLocale(locale: string, supported: ReadonlySet<string>): string | null {
   const def = defForLocale(locale);
   if (def) {
     const code = firstSupported(def, supported);
@@ -103,7 +103,16 @@ export function resolveTarget(locale: string, supported: ReadonlySet<string>): s
   }
   const prefix = locale.toLowerCase().split("-")[0] ?? "";
   if (prefix && supported.has(prefix)) return prefix;
-  return FALLBACK_TARGET;
+  return null;
+}
+
+/**
+ * Picks the backend code to translate into for a Discord locale. Falls back
+ * to English, so a locale the table doesn't know still yields something
+ * translatable.
+ */
+export function resolveTarget(locale: string, supported: ReadonlySet<string>): string {
+  return resolveLocale(locale, supported) ?? FALLBACK_TARGET;
 }
 
 /**

@@ -5,8 +5,10 @@ export interface CacheEntry {
   readonly backend: string;
   readonly source_lang: string;
   readonly created_at: string;
-  /** Detection confidence 0-100; absent when the source was given explicitly. */
+  /** Detection confidence 0-100; absent when the source was given explicitly or inferred. */
   readonly confidence?: number;
+  /** The source was taken from the author's Discord language after an unusable detection. */
+  readonly source_inferred?: true;
 }
 
 /**
@@ -49,7 +51,8 @@ function isCacheEntry(value: unknown): value is CacheEntry {
     typeof v.backend === "string" &&
     typeof v.source_lang === "string" &&
     typeof v.created_at === "string" &&
-    (v.confidence === undefined || typeof v.confidence === "number")
+    (v.confidence === undefined || typeof v.confidence === "number") &&
+    (v.source_inferred === undefined || v.source_inferred === true)
   );
 }
 

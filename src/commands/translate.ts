@@ -6,7 +6,7 @@ import {
 import type { AppContext } from "../context.js";
 import { COMMAND_DESCRIPTION_MAX, localizationsFor } from "../i18n/discord.js";
 import { staticI18n, type Translator } from "../i18n/index.js";
-import { menuLanguages, parseLanguageHint, parseLanguageSpec, resolveTarget } from "../locale.js";
+import { menuLanguages, parseLanguageHint, parseLanguageSpec, resolveLocale, resolveTarget } from "../locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForText } from "../sourceId.js";
 import { AUTO_SOURCE, MAX_INPUT_CHARS, translateWithCache } from "../translate.js";
@@ -94,7 +94,14 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
 
   const target = spec.target ?? resolveTarget(interaction.locale, supported);
   const sourceId = sourceIdForText(text);
-  const outcome = await translateWithCache(ctx, { sourceId, text, target, source: source ?? undefined });
+  const outcome = await translateWithCache(ctx, {
+    sourceId,
+    text,
+    target,
+    source: source ?? undefined,
+    // The user typed this text, so their own Discord language is the best guess at its language.
+    fallbackSource: resolveLocale(interaction.locale, supported) ?? undefined,
+  });
   await interaction.editReply(
     buildTranslationReply({ ...outcome, sourceId, source: source ?? AUTO_SOURCE, supported, tr }),
   );

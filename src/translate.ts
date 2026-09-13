@@ -1,3 +1,4 @@
+import type { TranslateResult } from "./backends/index.js";
 import type { CacheEntry } from "./cache.js";
 import type { AppContext } from "./context.js";
 
@@ -6,12 +7,24 @@ export const MAX_INPUT_CHARS = 4000;
 
 export const AUTO_SOURCE = "auto";
 
+/**
+ * At or below this confidence the detection carries no information — a two-word
+ * message scores like this whatever language it is — so `fallbackSource` wins.
+ */
+export const INFER_SOURCE_BELOW_PERCENT = 25;
+
 export interface TranslateInput {
   readonly sourceId: string;
   readonly text: string;
   readonly target: string;
   /** Backend code to force as the source language; omitted or "auto" means detect. */
   readonly source?: string;
+  /**
+   * Backend code to translate from when detection comes back below
+   * `INFER_SOURCE_BELOW_PERCENT`: the language of whoever wrote the text, as
+   * far as Discord reveals it. Ignored when `source` forces a language.
+   */
+  readonly fallbackSource?: string;
 }
 
 export interface TranslationOutcome {
@@ -32,6 +45,9 @@ type TranslateContext = Pick<AppContext, "backend" | "cache" | "log">;
  * A forced source skips the cache read and overwrites the entry: the user is
  * correcting a wrong detection, and the correction should be what everyone
  * gets from then on.
+ *
+ * A detection the backend itself barely believes is replaced by
+ * `fallbackSource`, at the cost of a second call on that rare path.
  */
 export async function translateWithCache(
   ctx: TranslateContext,
@@ -49,19 +65,43 @@ export async function translateWithCache(
     }
   }
 
-  const result = await ctx.backend.translate(text, source, target);
+  let result = await ctx.backend.translate(text, source, target);
+  let sourceLang = result.detectedSource;
+  let inferred = false;
+
+  const fallback = input.fallbackSource;
+  if (!forced && fallback !== undefined && isGuesswork(result, fallback)) {
+    ctx.log.info(
+      `${sourceId}: detection ${result.detectedSource} at ${Math.round(result.confidence ?? 0)}%; ` +
+        `translating from ${fallback} instead`,
+    );
+    result = await ctx.backend.translate(text, fallback, target);
+    sourceLang = fallback;
+    inferred = true;
+  }
+
   const entry: CacheEntry = {
     text: result.text,
     backend: ctx.backend.name,
-    source_lang: result.detectedSource,
+    source_lang: sourceLang,
     created_at: new Date().toISOString(),
-    ...(forced || result.confidence === undefined ? {} : { confidence: result.confidence }),
+    ...(inferred ? { source_inferred: true } : {}),
+    ...(forced || inferred || result.confidence === undefined ? {} : { confidence: result.confidence }),
   };
 
   await safe(ctx, "set", () => ctx.cache.set(sourceId, target, entry));
   await safe(ctx, "setSource", () => ctx.cache.setSource(sourceId, text));
 
-  return { entry, target, cached: false, sameLanguage: result.detectedSource === target };
+  return { entry, target, cached: false, sameLanguage: sourceLang === target };
+}
+
+/** A detection too weak to act on, naming something other than what the author's language suggests. */
+function isGuesswork(result: TranslateResult, fallback: string): boolean {
+  return (
+    result.confidence !== undefined &&
+    result.confidence < INFER_SOURCE_BELOW_PERCENT &&
+    result.detectedSource !== fallback
+  );
 }
 
 async function safe<T>(

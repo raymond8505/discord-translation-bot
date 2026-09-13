@@ -46,11 +46,13 @@ export function buildTranslationReply(
     input;
 
   const confidence = entry.confidence;
+  const inferred = entry.source_inferred === true;
   const uncertain =
-    confidence !== undefined && confidence < LOW_CONFIDENCE_PERCENT;
+    inferred || (confidence !== undefined && confidence < LOW_CONFIDENCE_PERCENT);
   const sourceLabel = labelFor(entry.source_lang, tr.language);
-  const sourcePart =
-    confidence === undefined
+  const sourcePart = inferred
+    ? tr.t("reply.inferred", { language: sourceLabel })
+    : confidence === undefined
       ? tr.t("reply.source", { language: sourceLabel })
       : `${tr.t("reply.detected", { language: sourceLabel })} (${Math.round(confidence)}%)`;
 

@@ -14,6 +14,7 @@
   "reply.title": "Traducción",
   "reply.source": "fuente: {language}",
   "reply.detected": "detectado: {language}",
+  "reply.inferred": "asumido: {language}",
   "reply.cached": "caché",
   "reply.sameLanguage": "ya en el idioma objetivo",
   "reply.uncertain.name": "No se pudo detectar automáticamente el idioma de origen",

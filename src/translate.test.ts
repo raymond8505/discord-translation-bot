@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { BackendError } from "./backends/index.js";
 import { sourceKey, translationKey } from "./cache.js";
-import { makeFakeBackend } from "./fixtures/backend.fixture.js";
+import { makeFakeBackend, unsureTranslate } from "./fixtures/backend.fixture.js";
 import { makeCacheEntry } from "./fixtures/cache.fixture.js";
 import { makeContext } from "./fixtures/context.fixture.js";
 import { makeFakeRedis } from "./fixtures/redis.fixture.js";
-import { MAX_INPUT_CHARS, translateWithCache } from "./translate.js";
+import { INFER_SOURCE_BELOW_PERCENT, MAX_INPUT_CHARS, translateWithCache } from "./translate.js";
 
 const ID = "123456789012345678";
 
@@ -61,6 +61,63 @@ describe("translateWithCache", () => {
     expect(outcome.entry).toMatchObject({ text: "[fr] j'adore", source_lang: "fr" });
     expect(outcome.entry).not.toHaveProperty("confidence");
     expect(await ctx.cache.get(ID, "en")).toMatchObject({ text: "[fr] j'adore" });
+  });
+
+  it("re-translates from the author's language when the detection is barely a guess", async () => {
+    const ctx = makeContext({ backend: makeFakeBackend({ translate: unsureTranslate(15) }) });
+
+    const outcome = await translateWithCache(ctx, {
+      sourceId: ID,
+      text: "ok",
+      target: "fr",
+      fallbackSource: "en",
+    });
+
+    expect(ctx.backend.translateCalls.map((c) => c.source)).toEqual(["auto", "en"]);
+    expect(outcome.entry).toMatchObject({ text: "[en→fr] ok", source_lang: "en", source_inferred: true });
+    expect(outcome.entry).not.toHaveProperty("confidence");
+    expect(await ctx.cache.get(ID, "fr")).toMatchObject({ source_inferred: true });
+    expect(ctx.log.entries.some((e) => e.level === "info")).toBe(true);
+  });
+
+  it("trusts a detection at the confidence floor and keeps its score", async () => {
+    const ctx = makeContext({
+      backend: makeFakeBackend({ translate: unsureTranslate(INFER_SOURCE_BELOW_PERCENT) }),
+    });
+
+    const outcome = await translateWithCache(ctx, { sourceId: ID, text: "ok", target: "fr", fallbackSource: "en" });
+
+    expect(ctx.backend.translateCalls).toHaveLength(1);
+    expect(outcome.entry.confidence).toBe(INFER_SOURCE_BELOW_PERCENT);
+    expect(outcome.entry).not.toHaveProperty("source_inferred");
+  });
+
+  it("leaves a weak detection alone when it already agrees with the author's language", async () => {
+    const ctx = makeContext({ backend: makeFakeBackend({ translate: unsureTranslate(15) }) });
+
+    const outcome = await translateWithCache(ctx, { sourceId: ID, text: "ok", target: "fr", fallbackSource: "es" });
+
+    expect(ctx.backend.translateCalls).toHaveLength(1);
+    expect(outcome.entry).toMatchObject({ source_lang: "es", confidence: 15 });
+  });
+
+  it("never second-guesses a forced source, and needs a fallback to act at all", async () => {
+    const ctx = makeContext({ backend: makeFakeBackend({ translate: unsureTranslate(15) }) });
+
+    await translateWithCache(ctx, { sourceId: ID, text: "ok", target: "fr", source: "de", fallbackSource: "en" });
+    const detected = await translateWithCache(ctx, { sourceId: "other", text: "ok", target: "fr" });
+
+    expect(ctx.backend.translateCalls.map((c) => c.source)).toEqual(["de", "auto"]);
+    expect(detected.entry).toMatchObject({ source_lang: "es", confidence: 15 });
+  });
+
+  it("flags an inferred source that is already the target", async () => {
+    const ctx = makeContext({ backend: makeFakeBackend({ translate: unsureTranslate(15) }) });
+
+    const outcome = await translateWithCache(ctx, { sourceId: ID, text: "ok", target: "en", fallbackSource: "en" });
+
+    expect(outcome.sameLanguage).toBe(true);
+    expect(outcome.entry.source_inferred).toBe(true);
   });
 
   it("flags a translation whose detected source equals the target", async () => {

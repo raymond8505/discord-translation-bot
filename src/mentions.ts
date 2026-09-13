@@ -2,7 +2,7 @@ import type { MessageMentionsHasOptions } from "discord.js";
 import type { AppContext } from "./context.js";
 import { isOperational, userMessageFor } from "./errors.js";
 import type { Translator } from "./i18n/index.js";
-import { parseLanguageSpec, resolveTarget } from "./locale.js";
+import { parseLanguageSpec, resolveLocale, resolveTarget } from "./locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "./reply.js";
 import { sourceIdForMessage } from "./sourceId.js";
 import { AUTO_SOURCE, translateWithCache } from "./translate.js";
@@ -82,7 +82,8 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
     );
     return;
   }
-  const target = spec.target ?? resolveTarget(message.guild?.preferredLocale ?? "", supported);
+  const guildLocale = message.guild?.preferredLocale ?? "";
+  const target = spec.target ?? resolveTarget(guildLocale, supported);
 
   const sourceId = sourceIdForMessage(parent.id);
   const outcome = await translateWithCache(ctx, {
@@ -90,6 +91,8 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
     text: parent.content,
     target,
     source: spec.source ?? undefined,
+    // Discord hides the parent author's locale, so the server's language stands in for it.
+    fallbackSource: resolveLocale(guildLocale, supported) ?? undefined,
   });
   await replyQuietly(
     message,

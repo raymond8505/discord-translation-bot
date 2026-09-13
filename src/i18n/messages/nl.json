@@ -14,6 +14,7 @@
   "reply.title": "Vertaling",
   "reply.source": "bron: {language}",
   "reply.detected": "gedetecteerd: {language}",
+  "reply.inferred": "verondersteld: {language}",
   "reply.cached": "gecached",
   "reply.sameLanguage": "al in de doeltaal",
   "reply.uncertain.name": "Kon brontaal niet automatisch detecteren",

@@ -6,6 +6,7 @@ import {
   menuLanguages,
   parseLanguageHint,
   parseLanguageSpec,
+  resolveLocale,
   resolveTarget,
 } from "./locale.js";
 
@@ -59,6 +60,19 @@ describe("resolveTarget", () => {
 
   it("is case-insensitive", () => {
     expect(resolveTarget("EN-us", supported)).toBe("en");
+  });
+});
+
+describe("resolveLocale", () => {
+  it("resolves what the table and the bare prefix know", () => {
+    expect(resolveLocale("zh-TW", supported)).toBe("zh-Hant");
+    expect(resolveLocale("de-CH", supported)).toBe("de");
+  });
+
+  it("reports null rather than English when the locale names nothing supported", () => {
+    expect(resolveLocale("hr", supported)).toBeNull();
+    expect(resolveLocale("xx-YY", supported)).toBeNull();
+    expect(resolveLocale("", supported)).toBeNull();
   });
 });
 
