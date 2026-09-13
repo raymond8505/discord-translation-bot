@@ -5,7 +5,11 @@ import {
   StringSelectMenuOptionBuilder,
 } from "discord.js";
 import type { CacheEntry } from "./cache.js";
-import { AUTO_VALUE, buildSelectCustomId, type SelectRole } from "./components/customId.js";
+import {
+  AUTO_VALUE,
+  buildSelectCustomId,
+  type SelectRole,
+} from "./components/customId.js";
 import { labelFor, menuLanguages, type MenuLanguage } from "./locale.js";
 
 /** Discord limits: embed description length, options per select menu, rows per message (5). */
@@ -17,7 +21,7 @@ const MENUS_PER_ROLE = 2;
 export const LOW_CONFIDENCE_PERCENT = 50;
 
 const UNCERTAIN_NOTE =
-  "If that's wrong, pick the source in the menus below, reply with `@bot <source>:<target>` " +
+  "Pick the source in the menus below or reply with `@Translation Bot <source>:<target>` " +
   "(e.g. `fr:en`), or use `/translate` with its `source` option.";
 
 const AUTO_OPTION: MenuLanguage = { code: AUTO_VALUE, label: "Auto-detect" };
@@ -38,11 +42,15 @@ export interface ReplyPayload {
   readonly components: ActionRowBuilder<StringSelectMenuBuilder>[];
 }
 
-export function buildTranslationReply(input: TranslationReplyInput): ReplyPayload {
-  const { entry, target, source, cached, sameLanguage, sourceId, supported } = input;
+export function buildTranslationReply(
+  input: TranslationReplyInput,
+): ReplyPayload {
+  const { entry, target, source, cached, sameLanguage, sourceId, supported } =
+    input;
 
   const confidence = entry.confidence;
-  const uncertain = confidence !== undefined && confidence < LOW_CONFIDENCE_PERCENT;
+  const uncertain =
+    confidence !== undefined && confidence < LOW_CONFIDENCE_PERCENT;
   const sourcePart =
     confidence === undefined
       ? `source: ${labelFor(entry.source_lang)}`
@@ -62,7 +70,10 @@ export function buildTranslationReply(input: TranslationReplyInput): ReplyPayloa
     .setDescription(truncate(entry.text, EMBED_DESCRIPTION_MAX))
     .setFooter({ text: footer });
   if (uncertain) {
-    embed.addFields({ name: "Not sure about the source language", value: UNCERTAIN_NOTE });
+    embed.addFields({
+      name: "Couldn't auto-detect source language",
+      value: UNCERTAIN_NOTE,
+    });
   }
 
   const languages = menuLanguages(supported);
@@ -94,7 +105,10 @@ export function buildTranslationReply(input: TranslationReplyInput): ReplyPayloa
 
 /** A one-line notice (errors, hints, expiry) with no menus. */
 export function buildNoticeReply(message: string): ReplyPayload {
-  return { embeds: [new EmbedBuilder().setDescription(message)], components: [] };
+  return {
+    embeds: [new EmbedBuilder().setDescription(message)],
+    components: [],
+  };
 }
 
 interface MenuSpec {
@@ -106,21 +120,33 @@ interface MenuSpec {
   readonly placeholder: string;
 }
 
-function buildMenus(spec: MenuSpec): ActionRowBuilder<StringSelectMenuBuilder>[] {
+function buildMenus(
+  spec: MenuSpec,
+): ActionRowBuilder<StringSelectMenuBuilder>[] {
   const languages = spec.languages.slice(0, OPTIONS_PER_MENU * MENUS_PER_ROLE);
   const rows: ActionRowBuilder<StringSelectMenuBuilder>[] = [];
 
   for (let index = 0; index * OPTIONS_PER_MENU < languages.length; index += 1) {
-    const chunk = languages.slice(index * OPTIONS_PER_MENU, (index + 1) * OPTIONS_PER_MENU);
+    const chunk = languages.slice(
+      index * OPTIONS_PER_MENU,
+      (index + 1) * OPTIONS_PER_MENU,
+    );
     const first = chunk[0];
     const last = chunk[chunk.length - 1];
     if (!first || !last) break;
 
     const menu = new StringSelectMenuBuilder()
       .setCustomId(
-        buildSelectCustomId({ role: spec.role, menuIndex: index, other: spec.other, sourceId: spec.sourceId }),
+        buildSelectCustomId({
+          role: spec.role,
+          menuIndex: index,
+          other: spec.other,
+          sourceId: spec.sourceId,
+        }),
       )
-      .setPlaceholder(`${spec.placeholder} (${first.label[0]}–${last.label[0]})`)
+      .setPlaceholder(
+        `${spec.placeholder} (${first.label[0]}–${last.label[0]})`,
+      )
       .addOptions(
         chunk.map((lang) =>
           new StringSelectMenuOptionBuilder()
@@ -129,7 +155,9 @@ function buildMenus(spec: MenuSpec): ActionRowBuilder<StringSelectMenuBuilder>[]
             .setDefault(lang.code === spec.selected),
         ),
       );
-    rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu));
+    rows.push(
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu),
+    );
   }
   return rows;
 }

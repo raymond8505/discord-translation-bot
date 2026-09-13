@@ -52,7 +52,7 @@ describe("buildTranslationReply", () => {
 
     const unsure = build({ entry: makeCacheEntry({ confidence: 45 }) }).embeds[0]?.toJSON();
     expect(unsure?.footer?.text).toContain("detected: Spanish (45%)");
-    expect(unsure?.fields?.[0]?.name).toMatch(/Not sure/);
+    expect(unsure?.fields?.[0]?.name).toMatch(/auto-detect/i);
     expect(unsure?.fields?.[0]?.value).toContain("fr:en");
   });
 
