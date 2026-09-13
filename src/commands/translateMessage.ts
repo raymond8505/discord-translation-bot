@@ -1,15 +1,18 @@
 import { ApplicationCommandType, ContextMenuCommandBuilder, MessageFlags } from "discord.js";
 import type { AppContext } from "../context.js";
+import { COMMAND_NAME_MAX, localizationsFor } from "../i18n/discord.js";
 import { staticI18n } from "../i18n/index.js";
 import { resolveTarget } from "../locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForMessage } from "../sourceId.js";
 import { AUTO_SOURCE, translateWithCache } from "../translate.js";
 
+/** The default name is what `interaction.commandName` carries whatever the user's locale. */
 export const TRANSLATE_MESSAGE_COMMAND_NAME = staticI18n.message("en", "cmd.translateMessage.name");
 
 export const translateMessageCommand = new ContextMenuCommandBuilder()
   .setName(TRANSLATE_MESSAGE_COMMAND_NAME)
+  .setNameLocalizations(localizationsFor("cmd.translateMessage.name", COMMAND_NAME_MAX))
   .setType(ApplicationCommandType.Message);
 
 /** The slice of `MessageContextMenuCommandInteraction` the handler touches. */

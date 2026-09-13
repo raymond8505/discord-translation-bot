@@ -4,6 +4,7 @@ import {
   type ApplicationCommandOptionChoiceData,
 } from "discord.js";
 import type { AppContext } from "../context.js";
+import { COMMAND_DESCRIPTION_MAX, localizationsFor } from "../i18n/discord.js";
 import { staticI18n, type Translator } from "../i18n/index.js";
 import { menuLanguages, parseLanguageHint, parseLanguageSpec, resolveTarget } from "../locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
@@ -22,10 +23,12 @@ const TARGET_DESCRIPTION_PARAMS = { form: "source:target", example: "fr:en" };
 export const translateCommand = new SlashCommandBuilder()
   .setName(TRANSLATE_COMMAND_NAME)
   .setDescription(staticI18n.message("en", "cmd.translate.description"))
+  .setDescriptionLocalizations(localizationsFor("cmd.translate.description", COMMAND_DESCRIPTION_MAX))
   .addStringOption((option) =>
     option
       .setName(TEXT_OPTION)
       .setDescription(staticI18n.message("en", "cmd.translate.text"))
+      .setDescriptionLocalizations(localizationsFor("cmd.translate.text", COMMAND_DESCRIPTION_MAX))
       .setRequired(true)
       .setMaxLength(MAX_INPUT_CHARS),
   )
@@ -33,12 +36,16 @@ export const translateCommand = new SlashCommandBuilder()
     option
       .setName(TARGET_OPTION)
       .setDescription(staticI18n.message("en", "cmd.translate.target", TARGET_DESCRIPTION_PARAMS))
+      .setDescriptionLocalizations(
+        localizationsFor("cmd.translate.target", COMMAND_DESCRIPTION_MAX, TARGET_DESCRIPTION_PARAMS),
+      )
       .setAutocomplete(true),
   )
   .addStringOption((option) =>
     option
       .setName(SOURCE_OPTION)
       .setDescription(staticI18n.message("en", "cmd.translate.source"))
+      .setDescriptionLocalizations(localizationsFor("cmd.translate.source", COMMAND_DESCRIPTION_MAX))
       .setAutocomplete(true),
   );
 

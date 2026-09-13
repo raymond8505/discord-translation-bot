@@ -22,6 +22,13 @@ describe("translateCommand", () => {
       ["source", false],
     ]);
   });
+
+  it("fills the colon form into the target description rather than leaving a placeholder", () => {
+    const target = translateCommand.toJSON().options?.find((o) => o.name === "target");
+    expect(target?.description).toContain("source:target");
+    expect(target?.description).not.toContain("{");
+    expect(target?.description_localizations).toBeDefined();
+  });
 });
 
 describe("handleTranslate", () => {
