@@ -42,6 +42,14 @@ Secrets: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `GUILD_ID`, `GH_DEPLOY_KEY`, `VPS
 `VPS_USER`, `VPS_SSH_KEY`, `VPS_DEPLOY_PATH`. Service URLs, `BACKEND` and `CACHE_TTL_SECONDS` are
 literals in the heredoc; change production config by editing them there.
 
+Two of those are OpenSSH **private** keys, and they authenticate opposite directions:
+`VPS_SSH_KEY` is how `appleboy/ssh-action` logs into the VPS (its public half is in the VPS user's
+`authorized_keys`), `GH_DEPLOY_KEY` is how the VPS clones this repo (its public half is a
+write-disabled repo deploy key). GitHub strips the trailing newline from a multiline secret, so the
+`printf '%s\n'` that writes `GH_DEPLOY_KEY` to `~/.ssh/github_discord_translation_bot` is load-bearing —
+`printf '%s'` yields `error in libcrypto`. Generating and installing both keys: README → "Repository
+secrets".
+
 ## LibreTranslate first start
 
 The first `up` on the VPS downloads ~10 GB of Argos models into the `lt-models` volume, which can

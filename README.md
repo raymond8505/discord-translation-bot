@@ -132,17 +132,118 @@ secret that is missing or wrong.
 | `VPS_SSH_KEY` | **Private** half of a key the Action uses to log into the VPS (below). |
 | `GH_DEPLOY_KEY` | **Private** half of a key the VPS uses to clone this repo (below). |
 
-Both key secrets hold a whole private key file, `BEGIN`/`END` lines included.
-Generate them without a passphrase — the Action cannot type one:
+Both key secrets hold a whole private key file. `-N ""` generates them without a
+passphrase, which is required — the Action cannot type one.
+
+Run everything below **on the VPS**, in the shell you get from:
 
 ```bash
-# 1. Action → VPS. Put the public half on the server, the private half in VPS_SSH_KEY.
-ssh-keygen -t ed25519 -C "github-actions-dtb" -f ~/.ssh/dtb_vps -N ""
-ssh <VPS_USER>@<VPS_HOST> "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys" < ~/.ssh/dtb_vps.pub
+ssh <your-own-user>@<VPS_HOST>
+```
 
-# 2. VPS → GitHub. Public half goes to Settings → Deploy keys → Add deploy key
-#    (leave "Allow write access" unchecked); private half goes in GH_DEPLOY_KEY.
+Your own login, with whatever key you already use. Generating both keypairs
+there keeps the commands in a plain bash shell and means no public key ever has
+to be moved between machines.
+
+#### Key 1 of 2 — GitHub Actions → VPS (`VPS_SSH_KEY`)
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-dtb" -f ~/.ssh/dtb_vps -N ""
+```
+
+That one command writes **two** files:
+
+| File | Which half | Goes to |
+| --- | --- | --- |
+| `~/.ssh/dtb_vps` | private (no extension) | the `VPS_SSH_KEY` secret |
+| `~/.ssh/dtb_vps.pub` | public | this VPS's `~/.ssh/authorized_keys` |
+
+Install the public half on this same machine — appending it to `authorized_keys`
+is what lets the Action log in:
+
+```bash
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+cat ~/.ssh/dtb_vps.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+Now print the private half:
+
+```bash
+cat ~/.ssh/dtb_vps
+```
+
+Select and copy **everything** it prints — the first line
+`-----BEGIN OPENSSH PRIVATE KEY-----`, every line between, and the last line
+`-----END OPENSSH PRIVATE KEY-----`. Then, on GitHub: **Settings → Secrets and
+variables → Actions → New repository secret**, *Name* `VPS_SSH_KEY`, *Secret* =
+the block you just copied. **Add secret**.
+
+#### Key 2 of 2 — VPS → GitHub (`GH_DEPLOY_KEY`)
+
+Still on the VPS:
+
+```bash
 ssh-keygen -t ed25519 -C "dtb-vps-deploy" -f ~/.ssh/dtb_repo -N ""
+```
+
+Again two files, and this time the halves go to two *different* places on
+GitHub:
+
+| File | Which half | Goes to |
+| --- | --- | --- |
+| `~/.ssh/dtb_repo` | private (no extension) | the `GH_DEPLOY_KEY` secret |
+| `~/.ssh/dtb_repo.pub` | public | this repo's **Deploy keys** |
+
+Print the public half:
+
+```bash
+cat ~/.ssh/dtb_repo.pub
+```
+
+It prints one line, shaped `ssh-ed25519 AAAAC3Nza… dtb-vps-deploy`. Copy that
+whole line. On GitHub: **Settings → Deploy keys → Add deploy key**, *Title*
+`dtb-vps`, *Key* = that line, and **leave "Allow write access" unchecked** — the
+VPS only ever reads. **Add key**.
+
+Print the private half:
+
+```bash
+cat ~/.ssh/dtb_repo
+```
+
+Copy from `-----BEGIN OPENSSH PRIVATE KEY-----` through
+`-----END OPENSSH PRIVATE KEY-----` inclusive, and paste it into **Settings →
+Secrets and variables → Actions → New repository secret**, *Name*
+`GH_DEPLOY_KEY`. (GitHub strips the trailing newline from every multiline
+secret; the workflow writes it back with `printf '%s\n'`, so you do not need to
+do anything about it.)
+
+#### Check the deploy key, then clean up
+
+From the VPS, with the public half registered above (answer `yes` to the
+host-key prompt):
+
+```bash
+ssh -i ~/.ssh/dtb_repo -o IdentitiesOnly=yes -T git@github.com
+```
+
+A working deploy key answers:
+
+```
+Hi raymond8505/discord-translation-bot! You've successfully authenticated, but GitHub does not provide shell access.
+```
+
+`Permission denied (publickey)` instead means `dtb_repo.pub` did not land in
+Deploy keys. `VPS_SSH_KEY` has no equivalent self-test — the deploy run is what
+proves it (see the empty-commit trigger below).
+
+Wait for a green deploy, then delete both private keys from the VPS. Nothing on
+the machine reads either file: GitHub holds both, and the workflow writes
+`GH_DEPLOY_KEY` to `~/.ssh/github_discord_translation_bot` itself on every run.
+
+```bash
+rm ~/.ssh/dtb_vps ~/.ssh/dtb_repo   # keep both .pub files
 ```
 
 The workflow clones over SSH (`git@github.com:…`), which is why the deploy key
