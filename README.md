@@ -155,5 +155,7 @@ it in `.env` locally, or edit the literal in the `.env` heredoc of
   not in `LT_LOAD_ONLY`; Argos has no Croatian model at all. Valid codes are
   the `from_code`/`to_code` values in the
   [Argos model index](https://raw.githubusercontent.com/argosopentech/argospm-index/main/index.json).
+  Note the spelling difference: load `pb`, `zh`, `zt` and LibreTranslate
+  reports them as `pt-BR`, `zh-Hans`, `zh-Hant`.
 - **No response to @mention** — the tagging message must be a *reply*, and
   the Message Content intent must be enabled in the developer portal.

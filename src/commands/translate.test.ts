@@ -110,8 +110,8 @@ describe("handleTranslateAutocomplete", () => {
     const byLabel = makeAutocompleteInteraction("chin");
     await handleTranslateAutocomplete(ctx, byLabel);
     expect(byLabel.calls[0]?.payload).toEqual([
-      { name: "Chinese (Simplified)", value: "zh" },
-      { name: "Chinese (Traditional)", value: "zt" },
+      { name: "Chinese (Simplified)", value: "zh-Hans" },
+      { name: "Chinese (Traditional)", value: "zh-Hant" },
     ]);
 
     const byCode = makeAutocompleteInteraction("ja");

@@ -27,8 +27,14 @@ languages) via `AbortSignal.timeout`. Response contract (verified against v1.9.6
 
 `src/locale.ts` holds `LANGUAGES`: one entry per language with `label`, preferred-first `codes`,
 and the Discord `locales` that map to it (all 32, tested). Resolution is always against the
-backend's live set (`ctx.languages.get()`), so an install without `zt` serves zh-TW via `zh`, and
-Croatian simply drops out of the menu on a backend that lacks `hr`.
+backend's live set (`ctx.languages.get()`), so an install without `zh-Hant` serves zh-TW via `zh`,
+and Croatian simply drops out of the menu on a backend that lacks `hr`.
+
+**Two code spellings.** `LT_LOAD_ONLY` takes Argos model codes (`pb`, `zh`, `zt`), but
+LibreTranslate's `/languages` and `/translate` expose them as `pt-BR`, `zh-Hans`, `zh-Hant`
+(`libretranslate/language.py` `aliases`). The table lists both, API spelling first. Code matching in
+`parseLanguageHint` is case-insensitive and returns the backend's exact spelling; the customId
+pattern accepts `xx`, `xxx`, and `xx-Xxxx` forms.
 
 - `resolveTarget(locale, supported)`: table → bare prefix → `en`.
 - `menuLanguages(supported)`: dedupes by backend code, sorted by label (≤ 50 for two menus).

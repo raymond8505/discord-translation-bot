@@ -29,20 +29,21 @@ describe("resolveTarget", () => {
     ["en-US", "en"],
     ["en-GB", "en"],
     ["es-419", "es"],
-    ["zh-CN", "zh"],
+    ["zh-CN", "zh-Hans"],
     ["sv-SE", "sv"],
-    ["pt-BR", "pb"],
+    ["pt-BR", "pt-BR"],
   ])("maps %s to %s", (locale, code) => {
     expect(resolveTarget(locale, supported)).toBe(code);
   });
 
-  it("prefers the alternate code when the backend has it", () => {
-    expect(resolveTarget("zh-TW", supported)).toBe("zt");
+  it("prefers the backend's specific code when it has it", () => {
+    expect(resolveTarget("zh-TW", supported)).toBe("zh-Hant");
     expect(resolveTarget("no", supported)).toBe("nb");
   });
 
-  it("falls back to the next candidate when the alternate is missing", () => {
+  it("falls back to the next candidate when the specific code is missing", () => {
     expect(resolveTarget("zh-TW", primaryOnly)).toBe("zh");
+    expect(resolveTarget("zh-CN", primaryOnly)).toBe("zh");
     expect(resolveTarget("pt-BR", primaryOnly)).toBe("pt");
   });
 
@@ -68,13 +69,17 @@ describe("menuLanguages", () => {
     expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b, "en")));
     expect(labels).not.toContain("Croatian");
     expect(labels).not.toContain("Lithuanian");
-    expect(menu).toContainEqual({ code: "zt", label: "Chinese (Traditional)" });
+    expect(menu).toContainEqual({ code: "zh-Hant", label: "Chinese (Traditional)" });
+    expect(menu).toContainEqual({ code: "pt", label: "Portuguese" });
+    expect(menu).toContainEqual({ code: "pt-BR", label: "Portuguese (Brazil)" });
   });
 
   it("drops an entry whose fallback collapses onto a listed code", () => {
     const menu = menuLanguages(primaryOnly);
     expect(menu.filter((m) => m.code === "zh")).toHaveLength(1);
+    expect(menu.filter((m) => m.code === "pt")).toHaveLength(1);
     expect(menu.map((m) => m.label)).not.toContain("Chinese (Traditional)");
+    expect(menu.map((m) => m.label)).not.toContain("Portuguese (Brazil)");
   });
 
   it("fits within two 25-option select menus", () => {
@@ -85,6 +90,8 @@ describe("menuLanguages", () => {
 describe("labelFor", () => {
   it("finds a label by any of its codes", () => {
     expect(labelFor("zt")).toBe("Chinese (Traditional)");
+    expect(labelFor("zh-Hant")).toBe("Chinese (Traditional)");
+    expect(labelFor("pt-BR")).toBe("Portuguese (Brazil)");
     expect(labelFor("no")).toBe("Norwegian");
   });
 
@@ -100,10 +107,12 @@ describe("parseLanguageHint", () => {
     ["to french", "fr"],
     ["into  Spanish", "es"],
     ["in Japanese", "ja"],
-    ["zh-TW", "zt"],
-    ["chinese", "zh"],
-    ["Chinese (Traditional)", "zt"],
-    ["pt-br", "pb"],
+    ["zh-TW", "zh-Hant"],
+    ["zh-hant", "zh-Hant"],
+    ["chinese", "zh-Hans"],
+    ["Chinese (Traditional)", "zh-Hant"],
+    ["pt-br", "pt-BR"],
+    ["portuguese", "pt"],
     ["ar", "ar"],
   ])("reads %j as %s", (text, code) => {
     expect(parseLanguageHint(text, supported)).toBe(code);

@@ -1,7 +1,11 @@
 /**
- * Maps Discord's locale codes onto the ISO-ish codes LibreTranslate uses.
- * `codes` is preferred-first: the runtime picks the first one the backend
- * reports, so a backend without `zt` still serves zh-TW users via `zh`.
+ * Maps Discord's locale codes onto the codes the backend reports. `codes` is
+ * preferred-first: the runtime picks the first one the backend's `/languages`
+ * lists, so a backend without `zh-Hant` still serves zh-TW users via `zh`.
+ *
+ * LibreTranslate exposes three Argos codes under other names (`pb` → `pt-BR`,
+ * `zh` → `zh-Hans`, `zt` → `zh-Hant`) while `LT_LOAD_ONLY` still takes the
+ * Argos spelling; both spellings are listed so either backend flavour works.
  */
 export interface LanguageDef {
   readonly label: string;
@@ -13,8 +17,8 @@ export const FALLBACK_TARGET = "en";
 
 export const LANGUAGES: readonly LanguageDef[] = [
   { label: "Bulgarian", codes: ["bg"], locales: ["bg"] },
-  { label: "Chinese (Simplified)", codes: ["zh"], locales: ["zh-CN"] },
-  { label: "Chinese (Traditional)", codes: ["zt", "zh"], locales: ["zh-TW"] },
+  { label: "Chinese (Simplified)", codes: ["zh-Hans", "zh"], locales: ["zh-CN"] },
+  { label: "Chinese (Traditional)", codes: ["zh-Hant", "zt", "zh-Hans", "zh"], locales: ["zh-TW"] },
   { label: "Croatian", codes: ["hr"], locales: ["hr"] },
   { label: "Czech", codes: ["cs"], locales: ["cs"] },
   { label: "Danish", codes: ["da"], locales: ["da"] },
@@ -33,7 +37,8 @@ export const LANGUAGES: readonly LanguageDef[] = [
   { label: "Lithuanian", codes: ["lt"], locales: ["lt"] },
   { label: "Norwegian", codes: ["nb", "no"], locales: ["no"] },
   { label: "Polish", codes: ["pl"], locales: ["pl"] },
-  { label: "Portuguese (Brazil)", codes: ["pb", "pt"], locales: ["pt-BR"] },
+  { label: "Portuguese", codes: ["pt"], locales: [] },
+  { label: "Portuguese (Brazil)", codes: ["pt-BR", "pb", "pt"], locales: ["pt-BR"] },
   { label: "Romanian", codes: ["ro"], locales: ["ro"] },
   { label: "Russian", codes: ["ru"], locales: ["ru"] },
   { label: "Spanish", codes: ["es"], locales: ["es-ES", "es-419"] },
@@ -115,14 +120,19 @@ export function parseLanguageHint(text: string, supported: ReadonlySet<string>):
 
   const matchers: Array<(def: LanguageDef) => boolean> = [
     (def) => def.label.toLowerCase() === phrase,
-    (def) => def.codes.some((c) => c === phrase) || def.locales.some((l) => l.toLowerCase() === phrase),
+    (def) =>
+      def.codes.some((c) => c.toLowerCase() === phrase) ||
+      def.locales.some((l) => l.toLowerCase() === phrase),
     (def) => def.label.toLowerCase().replace(/\s*\(.*\)$/, "") === phrase,
   ];
   for (const matches of matchers) {
     const def = LANGUAGES.find(matches);
     if (def) return firstSupported(def, supported) ?? null;
   }
-  if (supported.has(phrase)) return phrase;
+  // A backend code the table doesn't know, matched case-insensitively (`pt-br` → `pt-BR`).
+  for (const code of supported) {
+    if (code.toLowerCase() === phrase) return code;
+  }
   return null;
 }
 

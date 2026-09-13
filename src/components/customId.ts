@@ -9,7 +9,8 @@
  *   text itself comes back from the cache or a message re-fetch.
  */
 const PREFIX = "lang";
-const PATTERN = /^lang:([st]):(\d):([a-z]{2,3}|auto):([A-Za-z0-9_]{1,80})$/;
+// `other` is a backend code (`en`, `pt-BR`, `zh-Hant`) or `auto`.
+const PATTERN = /^lang:([st]):(\d):([A-Za-z]{2,3}(?:-[A-Za-z]{2,4})?|auto):([A-Za-z0-9_]{1,80})$/;
 
 export type SelectRole = "source" | "target";
 
