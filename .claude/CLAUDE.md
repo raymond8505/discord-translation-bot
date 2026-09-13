@@ -32,7 +32,7 @@ is a key in `src/i18n/messages/en.json` rendered through a `Translator` (`ctx.i1
 ## Read the doc when the trigger fires
 
 - **Touching `deploy.yml`, `docker-compose.yml`, the `Dockerfile`, or adding an env var** → [docs/deployment.md](docs/deployment.md)
-- **Adding or changing a command, the mention trigger, a select menu, or a customId** → [docs/discord-interactions.md](docs/discord-interactions.md)
-- **Working on a backend, `src/locale.ts`, the cache keys, or invalidation** → [docs/translation.md](docs/translation.md)
+- **Adding or changing a command, the mention or flag-reaction trigger, a select menu, or a customId** → [docs/discord-interactions.md](docs/discord-interactions.md)
+- **Working on a backend, `src/locale.ts`, `src/flags.ts`, the cache keys, or invalidation** → [docs/translation.md](docs/translation.md)
 - **Adding or rewording a message, touching `src/i18n/`, or running `yarn locales:generate`** → [docs/i18n.md](docs/i18n.md)
 - **Writing or changing a test or fixture** → [docs/testing.md](docs/testing.md)

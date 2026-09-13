@@ -107,6 +107,18 @@ export function resolveTarget(locale: string, supported: ReadonlySet<string>): s
 }
 
 /**
+ * The backend code to translate into for a language named by one of the
+ * table's own codes, with the same preferred-first fallback the menus get
+ * (`zh-Hant` → `zh-Hans` → `zh`). Null when neither the table nor the backend
+ * can serve it, which is how a caller learns to offer the menus instead.
+ */
+export function resolveLanguageCode(code: string, supported: ReadonlySet<string>): string | null {
+  const def = LANGUAGES.find((candidate) => candidate.codes.includes(code));
+  if (def) return firstSupported(def, supported) ?? null;
+  return supported.has(code) ? code : null;
+}
+
+/**
  * Languages to offer in the re-translate menu: every table entry the backend
  * can serve, one entry per backend code (a fallback that collapses onto an
  * already-listed code is dropped), named in `uiLang` and sorted by that name.

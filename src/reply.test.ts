@@ -5,7 +5,7 @@ import { makeSupported } from "./fixtures/languages.fixture.js";
 import { frenchMessages, makeMessages } from "./fixtures/messages.fixture.js";
 import { createI18n } from "./i18n/index.js";
 import { menuLanguages } from "./locale.js";
-import { buildNoticeReply, buildTranslationReply, truncate } from "./reply.js";
+import { buildLanguagePickerReply, buildNoticeReply, buildTranslationReply, truncate } from "./reply.js";
 
 const ID = "123456789012345678";
 const supported = makeSupported();
@@ -130,6 +130,44 @@ describe("truncate", () => {
   it("keeps short text and ends cut text with an ellipsis within the limit", () => {
     expect(truncate("abc", 3)).toBe("abc");
     expect(truncate("abcd", 3)).toBe("ab…");
+  });
+});
+
+describe("buildLanguagePickerReply", () => {
+  function pick(overrides: Partial<Parameters<typeof buildLanguagePickerReply>[0]> = {}) {
+    return buildLanguagePickerReply({
+      sourceId: ID,
+      supported,
+      tr: i18n.forLocale("en-US"),
+      notice: "No language for that flag.",
+      ...overrides,
+    });
+  }
+
+  it("puts the notice over target menus with nothing preselected", () => {
+    const reply = pick();
+    const all = menus(reply);
+
+    expect(reply.embeds[0]?.toJSON().description).toBe("No language for that flag.");
+    expect(reply.embeds[0]?.toJSON().title).toBeUndefined();
+    expect(all.map((m) => m.id?.role)).toEqual(all.map(() => "target"));
+    expect(all.flatMap((m) => m.options.map((o) => o.value))).toEqual(menuLanguages(supported).map((l) => l.code));
+    expect(all.flatMap((m) => m.options.filter((o) => o.default))).toEqual([]);
+  });
+
+  it("leaves the source on auto so the pick is a plain first translation", () => {
+    for (const menu of menus(pick())) {
+      expect(menu.id?.other).toBe("auto");
+      expect(menu.id?.sourceId).toBe(ID);
+    }
+  });
+
+  it("degrades to a bare notice when the backend has reported no languages", () => {
+    expect(pick({ supported: new Set() }).components).toEqual([]);
+  });
+
+  it("words the menus in the reader's language", () => {
+    expect(menus(pick({ tr: i18n.forLocale("fr") }))[0]?.placeholder).toMatch(/^Traduire vers…/);
   });
 });
 
