@@ -113,9 +113,51 @@ Other loops:
    secrets, `docker compose up -d --build --remove-orphans`, wait for the
    bot container to report **healthy**, `docker image prune -f`.
 
-GitHub secrets: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `GUILD_ID`,
-`GH_DEPLOY_KEY` (read-only deploy key for this repo), `VPS_HOST`,
-`VPS_USER`, `VPS_SSH_KEY`, `VPS_DEPLOY_PATH`.
+### Repository secrets
+
+The `deploy` job needs all eight before it can run. Set them at **Settings →
+Secrets and variables → Actions → New repository secret**; the names must
+match exactly. The `test` and `build` jobs need none of them, so a run that
+goes green twice and then fails on "Deploy to VPS" is the signature of a
+secret that is missing or wrong.
+
+| Secret | Value |
+| --- | --- |
+| `DISCORD_TOKEN` | Developer Portal → your **production** app → Bot → Reset Token. Shown once; a reset invalidates the running bot's session. |
+| `DISCORD_CLIENT_ID` | Same app → General Information → Application ID. |
+| `GUILD_ID` | In Discord with Developer Mode on, right-click the server → Copy Server ID. |
+| `VPS_HOST` | Hostname or IP you SSH to. |
+| `VPS_USER` | SSH user on that host. |
+| `VPS_DEPLOY_PATH` | Absolute path to check the repo out at, e.g. `/opt/discord-translation-bot`. Created on first deploy; `.env` and the Docker volumes live there, so never delete it. |
+| `VPS_SSH_KEY` | **Private** half of a key the Action uses to log into the VPS (below). |
+| `GH_DEPLOY_KEY` | **Private** half of a key the VPS uses to clone this repo (below). |
+
+Both key secrets hold a whole private key file, `BEGIN`/`END` lines included.
+Generate them without a passphrase — the Action cannot type one:
+
+```bash
+# 1. Action → VPS. Put the public half on the server, the private half in VPS_SSH_KEY.
+ssh-keygen -t ed25519 -C "github-actions-dtb" -f ~/.ssh/dtb_vps -N ""
+ssh <VPS_USER>@<VPS_HOST> "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys" < ~/.ssh/dtb_vps.pub
+
+# 2. VPS → GitHub. Public half goes to Settings → Deploy keys → Add deploy key
+#    (leave "Allow write access" unchecked); private half goes in GH_DEPLOY_KEY.
+ssh-keygen -t ed25519 -C "dtb-vps-deploy" -f ~/.ssh/dtb_repo -N ""
+```
+
+The workflow clones over SSH (`git@github.com:…`), which is why the deploy key
+is needed even while the repo is public.
+
+Prerequisites on the VPS: Docker with the Compose plugin, and the `VPS_USER`
+able to run `docker` without `sudo`.
+
+Only a push to `main` deploys. `workflow_dispatch` runs `test` and `build`
+but skips `deploy` (`if: github.event_name == 'push'`), so it cannot be used
+to check the secrets — push an empty commit instead:
+
+```bash
+git commit --allow-empty -m "chore: trigger deploy" && git push
+```
 
 **First deploy:** LibreTranslate downloads ~10 GB of models into the
 `lt-models` volume. The deploy does not wait for it; the bot comes up and
