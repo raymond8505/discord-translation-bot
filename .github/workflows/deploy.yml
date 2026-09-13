@@ -41,7 +41,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push'
+    # Pushes to main and manual redeploys, never pull requests. The branch guard
+    # matters for workflow_dispatch, which has no branch filter: the ssh script
+    # resets the VPS to origin/main, so a dispatch from any other branch would
+    # report a deploy of code that was never deployed.
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/main'
 
     steps:
       - name: Deploy to VPS
