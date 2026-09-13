@@ -5,7 +5,8 @@ import { staticI18n } from "../i18n/index.js";
 import { menuLanguages } from "../locale.js";
 import { EMBED_DESCRIPTION_MAX, truncate, type ReplyPayload } from "../reply.js";
 
-export const HELP_COMMAND_NAME = "help";
+/** Prefixed so it does not sit on top of every other bot's `/help` in the picker. */
+export const HELP_COMMAND_NAME = "tb-help";
 
 export const helpCommand = new SlashCommandBuilder()
   .setName(HELP_COMMAND_NAME)

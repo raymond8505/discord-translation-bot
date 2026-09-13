@@ -16,7 +16,7 @@ describe("registerCommands", () => {
       rest,
     );
 
-    expect(names).toEqual(["translate", "Translate Message", "help"]);
+    expect(names).toEqual(["translate", "Translate Message", "tb-help"]);
     expect(puts).toHaveLength(1);
     expect(puts[0]?.route).toBe(`/applications/${validEnv.DISCORD_CLIENT_ID}/guilds/${validEnv.GUILD_ID}/commands`);
     expect((puts[0]?.body as Array<{ name: string }>).map((c) => c.name)).toEqual(names);

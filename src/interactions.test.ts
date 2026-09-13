@@ -77,11 +77,11 @@ describe("createInteractionHandler", () => {
     expect(select.calls.at(-1)?.method).toBe("editReply");
   });
 
-  it("routes /help", async () => {
+  it("routes /tb-help", async () => {
     const ctx = makeContext();
     const help = makeHelpInteraction();
 
-    await createInteractionHandler(ctx)(asInteraction("chat", help, { commandName: "help" }));
+    await createInteractionHandler(ctx)(asInteraction("chat", help, { commandName: "tb-help" }));
 
     expect(lastReplyDescription(help)).toContain("`fr`");
     expect(ctx.backend.translateCalls).toHaveLength(0);

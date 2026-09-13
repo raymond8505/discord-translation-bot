@@ -12,7 +12,7 @@ import { handleHelp, helpCommand } from "./help.js";
 describe("helpCommand", () => {
   it("is a plain slash command with no options", () => {
     const json = helpCommand.toJSON();
-    expect(json.name).toBe("help");
+    expect(json.name).toBe("tb-help");
     expect(json.options ?? []).toEqual([]);
   });
 });
