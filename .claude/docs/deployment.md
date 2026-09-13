@@ -29,7 +29,10 @@ difference is an `.env` value; there is no `docker-compose.override.yml` and non
 ## Deploy workflow
 
 `test` (typecheck, lint, tests) → `build` (validator, `docker build`, `docker compose config` with
-`.env.example` copied to `.env`) → `deploy` on push to `main` only. The deploy step is
+`.env.example` copied to `.env`) → `deploy` on pushes to `main` and on manual `workflow_dispatch`
+runs from `main`, never on pull requests. The branch guard in the `if:` is what keeps a dispatch
+from another branch from reporting a deploy: the ssh script resets the VPS to `origin/main`
+regardless of the dispatching ref. The deploy step is
 `appleboy/ssh-action` with a **10-minute command timeout**: clone-or-reset at `VPS_DEPLOY_PATH`,
 write `.env`, `docker compose up -d --build --remove-orphans`, poll
 `docker inspect --format '{{.State.Health.Status}}' discord-translation-bot` for `healthy` (24 × 5 s),
