@@ -2,6 +2,8 @@ export interface TranslateResult {
   readonly text: string;
   /** Backend code of the source language; echoes `source` when it was not "auto". */
   readonly detectedSource: string;
+  /** Detection confidence 0-100 when the backend auto-detected; absent for an explicit source. */
+  readonly confidence?: number;
 }
 
 export interface TranslationBackend {

@@ -125,3 +125,37 @@ export function parseLanguageHint(text: string, supported: ReadonlySet<string>):
   if (supported.has(phrase)) return phrase;
   return null;
 }
+
+export interface LanguageSpec {
+  readonly source: string | null;
+  readonly target: string | null;
+  /** Parts that named no supported language, e.g. `["klingon"]` for "klingon:en". */
+  readonly unresolved: readonly string[];
+}
+
+const EMPTY_SPEC: LanguageSpec = { source: null, target: null, unresolved: [] };
+
+/**
+ * Reads a `source:target` pair out of free text. Either side may be empty
+ * (`fr:` forces the source, `:en` picks the target) and text without a colon
+ * is a bare target hint. Each side accepts whatever `parseLanguageHint` does.
+ */
+export function parseLanguageSpec(text: string, supported: ReadonlySet<string>): LanguageSpec {
+  const phrase = text.trim();
+  if (!phrase) return EMPTY_SPEC;
+
+  const colon = phrase.indexOf(":");
+  if (colon === -1) {
+    const target = parseLanguageHint(phrase, supported);
+    return { source: null, target, unresolved: target ? [] : [phrase] };
+  }
+
+  const left = phrase.slice(0, colon).trim();
+  const right = phrase.slice(colon + 1).trim();
+  const source = left ? parseLanguageHint(left, supported) : null;
+  const target = right ? parseLanguageHint(right, supported) : null;
+  const unresolved = [left && !source ? left : null, right && !target ? right : null].filter(
+    (part): part is string => part !== null,
+  );
+  return { source, target, unresolved };
+}

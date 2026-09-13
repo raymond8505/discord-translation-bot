@@ -32,9 +32,15 @@ Add a new command by exporting its builder from `src/commands/`, appending it to
 
 Fires only when the message is not from a bot, `mentions.has(botId, { ignoreEveryone,
 ignoreRoles, ignoreRepliedUser })` is true (a reply to a bot message auto-mentions it and must
-not trigger), and `message.reference` is set; otherwise it replies with a one-line hint. Target
-language: `parseLanguageHint()` on the tagging text with mentions stripped → `guild.preferredLocale`
-→ `en` (messages carry no user locale). Replies use `allowedMentions: { repliedUser: false }`.
+not trigger), and `message.reference` is set; otherwise it replies with a one-line hint. Languages:
+`parseLanguageSpec()` on the tagging text with mentions stripped reads `source:target`, `source:`,
+`:target`, or a bare target; the target falls back to `guild.preferredLocale` → `en` (messages carry
+no user locale). Free chat around the mention is tolerated; only the colon form rejects an unknown
+name. Replies use `allowedMentions: { repliedUser: false }`.
+
+`/translate` mirrors this: `target` accepts the colon form too, and a separate `source` option
+(autocompleted) forces the source. A forced source bypasses the cache read and overwrites the entry
+(`src/translate.ts`), so it corrects a wrong detection for everyone.
 
 ## customId scheme
 

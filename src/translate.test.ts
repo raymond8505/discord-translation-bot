@@ -34,6 +34,35 @@ describe("translateWithCache", () => {
     expect(ctx.redis.store.get(sourceKey(ID))).toEqual({ value: "hola", ex: 42 });
   });
 
+  it("keeps the backend's detection confidence in the entry", async () => {
+    const backend = makeFakeBackend({
+      translate: async () => ({ text: "hi", detectedSource: "es", confidence: 45 }),
+    });
+    const ctx = makeContext({ backend });
+
+    const outcome = await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en" });
+
+    expect(outcome.entry.confidence).toBe(45);
+    expect(JSON.parse(ctx.redis.store.get(translationKey(ID, "en"))?.value ?? "")).toMatchObject({ confidence: 45 });
+  });
+
+  it("with a forced source, skips the cached entry, overwrites it, and records no confidence", async () => {
+    const stale = makeCacheEntry({ text: "wrong", source_lang: "es", confidence: 45 });
+    const redis = makeFakeRedis({ [translationKey(ID, "en")]: JSON.stringify(stale) });
+    const backend = makeFakeBackend({
+      translate: async (text, source) => ({ text: `[${source}] ${text}`, detectedSource: source }),
+    });
+    const ctx = makeContext({ redis, backend });
+
+    const outcome = await translateWithCache(ctx, { sourceId: ID, text: "j'adore", target: "en", source: "fr" });
+
+    expect(ctx.backend.translateCalls).toEqual([{ text: "j'adore", source: "fr", target: "en" }]);
+    expect(outcome.cached).toBe(false);
+    expect(outcome.entry).toMatchObject({ text: "[fr] j'adore", source_lang: "fr" });
+    expect(outcome.entry).not.toHaveProperty("confidence");
+    expect(await ctx.cache.get(ID, "en")).toMatchObject({ text: "[fr] j'adore" });
+  });
+
   it("flags a translation whose detected source equals the target", async () => {
     const ctx = makeContext();
 

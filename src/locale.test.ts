@@ -5,6 +5,7 @@ import {
   labelFor,
   menuLanguages,
   parseLanguageHint,
+  parseLanguageSpec,
   resolveTarget,
 } from "./locale.js";
 
@@ -116,5 +117,26 @@ describe("parseLanguageHint", () => {
 
   it("returns null when the named language is unsupported", () => {
     expect(parseLanguageHint("croatian", supported)).toBeNull();
+  });
+});
+
+describe("parseLanguageSpec", () => {
+  it.each([
+    ["fr:en", "fr", "en"],
+    ["french:english", "fr", "en"],
+    ["fr:", "fr", null],
+    [":de", null, "de"],
+    [" fr : en ", "fr", "en"],
+    ["de", null, "de"],
+    ["to german", null, "de"],
+    ["", null, null],
+  ])("reads %j as source %s → target %s", (text, source, target) => {
+    expect(parseLanguageSpec(text, supported)).toEqual({ source, target, unresolved: [] });
+  });
+
+  it("reports the parts it cannot resolve", () => {
+    expect(parseLanguageSpec("klingon:en", supported)).toEqual({ source: null, target: "en", unresolved: ["klingon"] });
+    expect(parseLanguageSpec("fr:klingon", supported)).toEqual({ source: "fr", target: null, unresolved: ["klingon"] });
+    expect(parseLanguageSpec("please", supported)).toEqual({ source: null, target: null, unresolved: ["please"] });
   });
 });

@@ -4,7 +4,7 @@ import {
   type ApplicationCommandOptionChoiceData,
 } from "discord.js";
 import type { AppContext } from "../context.js";
-import { menuLanguages, parseLanguageHint, resolveTarget } from "../locale.js";
+import { menuLanguages, parseLanguageHint, parseLanguageSpec, resolveTarget } from "../locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForText } from "../sourceId.js";
 import { MAX_INPUT_CHARS, translateWithCache } from "../translate.js";
@@ -12,6 +12,7 @@ import { MAX_INPUT_CHARS, translateWithCache } from "../translate.js";
 export const TRANSLATE_COMMAND_NAME = "translate";
 const TEXT_OPTION = "text";
 const TARGET_OPTION = "target";
+const SOURCE_OPTION = "source";
 const AUTOCOMPLETE_MAX = 25;
 
 export const translateCommand = new SlashCommandBuilder()
@@ -27,7 +28,13 @@ export const translateCommand = new SlashCommandBuilder()
   .addStringOption((option) =>
     option
       .setName(TARGET_OPTION)
-      .setDescription("Target language (defaults to your Discord language)")
+      .setDescription("Target language (defaults to your Discord language); also accepts source:target, e.g. fr:en")
+      .setAutocomplete(true),
+  )
+  .addStringOption((option) =>
+    option
+      .setName(SOURCE_OPTION)
+      .setDescription("Source language, when auto-detection gets it wrong")
       .setAutocomplete(true),
   );
 
@@ -41,6 +48,10 @@ export interface TranslateInteraction {
   editReply(payload: ReplyPayload): Promise<unknown>;
 }
 
+function unknownLanguage(name: string): ReplyPayload {
+  return buildNoticeReply(`I don't know a language called "${name}".`);
+}
+
 export async function handleTranslate(ctx: AppContext, interaction: TranslateInteraction): Promise<void> {
   // Discord gives us 3 seconds to acknowledge; the backend can take longer.
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -52,15 +63,26 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
   }
 
   const supported = await ctx.languages.get();
-  const requested = interaction.options.getString(TARGET_OPTION);
-  const target = requested ? parseLanguageHint(requested, supported) : resolveTarget(interaction.locale, supported);
-  if (!target) {
-    await interaction.editReply(buildNoticeReply(`I don't know a language called "${requested}".`));
+
+  const spec = parseLanguageSpec(interaction.options.getString(TARGET_OPTION) ?? "", supported);
+  if (spec.unresolved.length > 0) {
+    await interaction.editReply(unknownLanguage(spec.unresolved[0] ?? ""));
     return;
   }
 
+  let source = spec.source;
+  const sourceRaw = interaction.options.getString(SOURCE_OPTION);
+  if (sourceRaw) {
+    source = parseLanguageHint(sourceRaw, supported);
+    if (!source) {
+      await interaction.editReply(unknownLanguage(sourceRaw));
+      return;
+    }
+  }
+
+  const target = spec.target ?? resolveTarget(interaction.locale, supported);
   const sourceId = sourceIdForText(text);
-  const outcome = await translateWithCache(ctx, { sourceId, text, target });
+  const outcome = await translateWithCache(ctx, { sourceId, text, target, source: source ?? undefined });
   await interaction.editReply(buildTranslationReply({ ...outcome, sourceId, supported }));
 }
 
@@ -69,7 +91,7 @@ export interface TranslateAutocompleteInteraction {
   respond(choices: readonly ApplicationCommandOptionChoiceData[]): Promise<unknown>;
 }
 
-/** Must answer within 3 seconds, so it only ever reads the memoized language set. */
+/** Serves both `target` and `source`. Must answer within 3 seconds, so it only reads the memoized set. */
 export async function handleTranslateAutocomplete(
   ctx: AppContext,
   interaction: TranslateAutocompleteInteraction,

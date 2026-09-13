@@ -28,6 +28,50 @@ describe("createSupportedLanguages", () => {
     expect(backend.languagesCalls).toBe(1);
   });
 
+  it("serves a stale memo immediately and refreshes it in the background", async () => {
+    let clock = 0;
+    let codes = ["en", "es"];
+    const backend = makeFakeBackend({ languages: async () => [...codes] });
+    const languages = createSupportedLanguages(backend, makeRecordingLogger(), {
+      refreshMs: 1_000,
+      now: () => clock,
+    });
+
+    await languages.get();
+    codes = ["en", "es", "fr", "de"];
+    clock = 999;
+    expect((await languages.get()).size).toBe(2);
+    expect(backend.languagesCalls).toBe(1);
+
+    clock = 1_000;
+    expect((await languages.get()).size).toBe(2);
+    expect(backend.languagesCalls).toBe(2);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(languages.peek()?.size).toBe(4);
+  });
+
+  it("keeps the old set when a background refresh fails", async () => {
+    let clock = 0;
+    let fail = false;
+    const backend = makeFakeBackend({
+      languages: async () => {
+        if (fail) throw new BackendError("network", "down");
+        return ["en", "es"];
+      },
+    });
+    const logger = makeRecordingLogger();
+    const languages = createSupportedLanguages(backend, logger, { refreshMs: 1_000, now: () => clock });
+
+    await languages.get();
+    fail = true;
+    clock = 5_000;
+    languages.peek();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(languages.peek()?.size).toBe(2);
+    expect(logger.entries.some((e) => e.level === "warn")).toBe(true);
+  });
+
   it("retries on the next call after a failure instead of caching it", async () => {
     let attempts = 0;
     const backend = makeFakeBackend({

@@ -18,6 +18,7 @@ describe("translateCommand", () => {
     expect(json.options?.map((o) => [o.name, "required" in o && o.required])).toEqual([
       ["text", true],
       ["target", false],
+      ["source", false],
     ]);
   });
 });
@@ -43,6 +44,32 @@ describe("handleTranslate", () => {
     await handleTranslate(ctx, makeChatInputInteraction({ target: "German" }));
 
     expect(ctx.backend.translateCalls.map((c) => c.target)).toEqual(["ja", "de"]);
+  });
+
+  it("forces the source from the source option or a source:target in target", async () => {
+    const ctx = makeContext();
+
+    await handleTranslate(ctx, makeChatInputInteraction({ source: "french" }));
+    await handleTranslate(ctx, makeChatInputInteraction({ target: "fr:de" }));
+    await handleTranslate(ctx, makeChatInputInteraction({ target: "fr:", locale: "ja" }));
+    await handleTranslate(ctx, makeChatInputInteraction({ target: "es:de", source: "fr" }));
+
+    expect(ctx.backend.translateCalls.map((c) => [c.source, c.target])).toEqual([
+      ["fr", "en"],
+      ["fr", "de"],
+      ["fr", "ja"],
+      ["fr", "de"],
+    ]);
+  });
+
+  it("rejects a source it cannot resolve without calling the backend", async () => {
+    const ctx = makeContext();
+    const interaction = makeChatInputInteraction({ source: "klingon" });
+
+    await handleTranslate(ctx, interaction);
+
+    expect(lastReplyDescription(interaction)).toContain("klingon");
+    expect(ctx.backend.translateCalls).toHaveLength(0);
   });
 
   it("rejects a target it cannot resolve without calling the backend", async () => {

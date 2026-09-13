@@ -29,6 +29,34 @@ describe("handleMentionMessage", () => {
     expect(ctx.backend.translateCalls.map((c) => c.target)).toEqual(["ja", "fr"]);
   });
 
+  it("forces the source with the source:target form", async () => {
+    const ctx = makeContext();
+
+    await handleMentionMessage(ctx, makeMentionMessage({ content: `<@${BOT_USER_ID}> fr:en` }));
+    await handleMentionMessage(ctx, makeMentionMessage({ content: `<@${BOT_USER_ID}> fr:`, preferredLocale: "de" }));
+    await handleMentionMessage(ctx, makeMentionMessage({ content: `<@${BOT_USER_ID}> :ja` }));
+
+    expect(ctx.backend.translateCalls.map((c) => [c.source, c.target])).toEqual([
+      ["fr", "en"],
+      ["fr", "de"],
+      ["auto", "ja"],
+    ]);
+  });
+
+  it("rejects an unknown language in the colon form but tolerates free chat", async () => {
+    const ctx = makeContext();
+
+    const strict = makeMentionMessage({ content: `<@${BOT_USER_ID}> klingon:en` });
+    await handleMentionMessage(ctx, strict);
+    expect(lastReplyDescription(strict)).toContain("klingon");
+
+    const chatty = makeMentionMessage({ content: `<@${BOT_USER_ID}> please` });
+    await handleMentionMessage(ctx, chatty);
+    expect(lastReplyDescription(chatty)).toBe(`[en] ${SPANISH_TEXT}`);
+
+    expect(ctx.backend.translateCalls).toHaveLength(1);
+  });
+
   it("does nothing for bot authors, non-mentions, or before the client is ready", async () => {
     const ctx = makeContext();
     const cases = [

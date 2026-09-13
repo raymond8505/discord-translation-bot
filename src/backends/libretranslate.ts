@@ -52,9 +52,11 @@ export class LibreTranslateBackend implements TranslationBackend {
       throw new BackendError("invalid_response", "LibreTranslate /translate returned no translatedText");
     }
     const detected = body.detectedLanguage;
-    const detectedSource =
-      isRecord(detected) && typeof detected.language === "string" ? detected.language : source;
-    return { text: body.translatedText, detectedSource };
+    if (isRecord(detected) && typeof detected.language === "string") {
+      const confidence = typeof detected.confidence === "number" ? detected.confidence : undefined;
+      return { text: body.translatedText, detectedSource: detected.language, confidence };
+    }
+    return { text: body.translatedText, detectedSource: source };
   }
 
   async languages(): Promise<string[]> {

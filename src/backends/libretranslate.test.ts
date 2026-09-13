@@ -33,7 +33,7 @@ describe("LibreTranslateBackend.translate", () => {
 
     const result = await backend.translate("¿Hola, cómo estás?", "auto", "en");
 
-    expect(result).toEqual({ text: translateResponse.translatedText, detectedSource: "es" });
+    expect(result).toEqual({ text: translateResponse.translatedText, detectedSource: "es", confidence: 92.5 });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe(`${BASE}/translate`);
     expect(calls[0]?.init?.method).toBe("POST");
@@ -52,6 +52,7 @@ describe("LibreTranslateBackend.translate", () => {
     const result = await backend.translate("Hello", "en", "fr");
 
     expect(result.detectedSource).toBe("en");
+    expect(result).not.toHaveProperty("confidence");
   });
 
   it("passes undetectable input through as the backend reports it", async () => {
@@ -60,7 +61,7 @@ describe("LibreTranslateBackend.translate", () => {
 
     const result = await backend.translate("🎉🎉", "auto", "fr");
 
-    expect(result).toEqual({ text: "🎉🎉", detectedSource: "en" });
+    expect(result).toEqual({ text: "🎉🎉", detectedSource: "en", confidence: 0 });
   });
 
   it("classifies HTTP failures and surfaces the server's error text", async () => {

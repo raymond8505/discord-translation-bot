@@ -1,7 +1,7 @@
 import type { MessageMentionsHasOptions } from "discord.js";
 import type { AppContext } from "./context.js";
 import { isOperational, userMessageFor } from "./errors.js";
-import { parseLanguageHint, resolveTarget } from "./locale.js";
+import { parseLanguageSpec, resolveTarget } from "./locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "./reply.js";
 import { sourceIdForMessage } from "./sourceId.js";
 import { translateWithCache } from "./translate.js";
@@ -29,7 +29,8 @@ const MENTION_OPTIONS: MessageMentionsHasOptions = {
 };
 
 const HINT_REPLY =
-  "Reply to the message you want translated and @mention me. Add a language to pick the target, e.g. `@bot french`.";
+  "Reply to the message you want translated and @mention me. Add a language to pick the target " +
+  "(`@bot french`), or `source:target` to force the source too (`@bot fr:en`, `@bot fr:`).";
 
 const USER_MENTION = /<@!?\d+>/g;
 
@@ -73,11 +74,21 @@ async function translateParent(ctx: AppContext, message: MentionMessage): Promis
 
   const supported = await ctx.languages.get();
   const hint = message.content.replace(USER_MENTION, " ");
-  const target =
-    parseLanguageHint(hint, supported) ?? resolveTarget(message.guild?.preferredLocale ?? "", supported);
+  const spec = parseLanguageSpec(hint, supported);
+  // Free chat around the mention is fine; only the explicit colon form is strict.
+  if (hint.includes(":") && spec.unresolved.length > 0) {
+    await replyQuietly(message, buildNoticeReply(`I don't know a language called "${spec.unresolved[0]}".`));
+    return;
+  }
+  const target = spec.target ?? resolveTarget(message.guild?.preferredLocale ?? "", supported);
 
   const sourceId = sourceIdForMessage(parent.id);
-  const outcome = await translateWithCache(ctx, { sourceId, text: parent.content, target });
+  const outcome = await translateWithCache(ctx, {
+    sourceId,
+    text: parent.content,
+    target,
+    source: spec.source ?? undefined,
+  });
   await replyQuietly(message, buildTranslationReply({ ...outcome, sourceId, supported }));
 }
 

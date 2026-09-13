@@ -5,6 +5,8 @@ export interface CacheEntry {
   readonly backend: string;
   readonly source_lang: string;
   readonly created_at: string;
+  /** Detection confidence 0-100; absent when the source was given explicitly. */
+  readonly confidence?: number;
 }
 
 /**
@@ -46,7 +48,8 @@ function isCacheEntry(value: unknown): value is CacheEntry {
     typeof v.text === "string" &&
     typeof v.backend === "string" &&
     typeof v.source_lang === "string" &&
-    typeof v.created_at === "string"
+    typeof v.created_at === "string" &&
+    (v.confidence === undefined || typeof v.confidence === "number")
   );
 }
 

@@ -15,6 +15,7 @@ export const SPANISH_TEXT = "¿Hola, cómo estás?";
 export interface ChatInputOptions {
   text?: string;
   target?: string | null;
+  source?: string | null;
   locale?: string;
 }
 
@@ -25,6 +26,7 @@ export function makeChatInputInteraction(
   const values: Record<string, string | null> = {
     text: options.text ?? SPANISH_TEXT,
     target: options.target ?? null,
+    source: options.source ?? null,
   };
   return {
     calls,

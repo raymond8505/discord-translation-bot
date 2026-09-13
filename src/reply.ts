@@ -13,6 +13,13 @@ const EMBED_DESCRIPTION_MAX = 4096;
 const OPTIONS_PER_MENU = 25;
 const MAX_MENUS = 2;
 
+/** Below this, LibreTranslate's guess is shown with a "not sure" note and how to force the source. */
+export const LOW_CONFIDENCE_PERCENT = 50;
+
+const UNCERTAIN_NOTE =
+  "If that's wrong, force the source: reply with `@bot <source>:<target>` (e.g. `fr:en`), " +
+  "or use `/translate` with its `source` option.";
+
 export interface TranslationReplyInput {
   readonly sourceId: string;
   readonly target: string;
@@ -30,8 +37,15 @@ export interface ReplyPayload {
 export function buildTranslationReply(input: TranslationReplyInput): ReplyPayload {
   const { entry, target, cached, sameLanguage, sourceId, supported } = input;
 
+  const confidence = entry.confidence;
+  const uncertain = confidence !== undefined && confidence < LOW_CONFIDENCE_PERCENT;
+  const sourcePart =
+    confidence === undefined
+      ? `source: ${labelFor(entry.source_lang)}`
+      : `detected: ${labelFor(entry.source_lang)} (${Math.round(confidence)}%)`;
+
   const footer = [
-    `detected: ${labelFor(entry.source_lang)}`,
+    sourcePart,
     entry.backend,
     cached ? "cached" : null,
     sameLanguage ? "already in the target language" : null,
@@ -43,6 +57,9 @@ export function buildTranslationReply(input: TranslationReplyInput): ReplyPayloa
     .setTitle(`Translation → ${labelFor(target)}`)
     .setDescription(truncate(entry.text, EMBED_DESCRIPTION_MAX))
     .setFooter({ text: footer });
+  if (uncertain) {
+    embed.addFields({ name: "Not sure about the source language", value: UNCERTAIN_NOTE });
+  }
 
   return { embeds: [embed], components: buildLanguageMenus(sourceId, target, supported) };
 }

@@ -26,7 +26,7 @@ describe("buildTranslationReply", () => {
 
     expect(embed?.title).toBe("Translation → English");
     expect(embed?.description).toBe(makeCacheEntry().text);
-    expect(embed?.footer?.text).toBe("detected: Spanish · libretranslate");
+    expect(embed?.footer?.text).toBe("source: Spanish · libretranslate");
   });
 
   it("annotates cached and same-language results in the footer", () => {
@@ -34,6 +34,23 @@ describe("buildTranslationReply", () => {
 
     expect(embed?.footer?.text).toContain("cached");
     expect(embed?.footer?.text).toContain("already in the target language");
+  });
+
+  it("shows the detection confidence and, when low, how to force the source", () => {
+    const confident = build({ entry: makeCacheEntry({ confidence: 92.5 }) }).embeds[0]?.toJSON();
+    expect(confident?.footer?.text).toContain("detected: Spanish (93%)");
+    expect(confident?.fields).toBeUndefined();
+
+    const unsure = build({ entry: makeCacheEntry({ confidence: 45 }) }).embeds[0]?.toJSON();
+    expect(unsure?.footer?.text).toContain("detected: Spanish (45%)");
+    expect(unsure?.fields?.[0]?.name).toMatch(/Not sure/);
+    expect(unsure?.fields?.[0]?.value).toContain("fr:en");
+  });
+
+  it("labels a forced source as given rather than detected", () => {
+    const embed = build({ entry: makeCacheEntry({ source_lang: "fr" }) }).embeds[0]?.toJSON();
+    expect(embed?.footer?.text).toContain("source: French");
+    expect(embed?.footer?.text).not.toContain("detected");
   });
 
   it("truncates long text to the embed limit", () => {
