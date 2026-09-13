@@ -9,6 +9,7 @@
   "translate.noText": "Diese Nachricht hat keinen Text zu übersetzen.",
   "mention.hint": "Antworte auf die Nachricht, die du übersetzt haben möchtest und @erwähne mich. Fügen Sie eine Sprache hinzu, um das Ziel auszuwählen (`@bot french`), oder `source:target`, um auch die Quelle zu erzwingen (`@bot fr:en`, `@bot fr:`).",
   "mention.unreadable": "Ich konnte die Nachricht, auf die du geantwortet hast, nicht lesen.",
+  "reaction.unsupported": "Ich habe keine Sprache für {flag}. Wählen Sie ein Ziel unten.",
   "select.none": "Keine Sprache ausgewählt.",
   "select.expired": "Der Originaltext kann nicht mehr übersetzt werden.",
   "reply.title": "Übersetzung",
@@ -29,5 +30,6 @@
   "cmd.help.description": "Liste der unterstützten Sprachen und deren Codes",
   "help.title": "Unterstützte Sprachen",
   "help.intro": "Verwenden Sie einen beliebigen Namen oder Code unten als Ziel oder `source:target`, um auch die Quelle zu erzwingen.",
-  "help.usage": "Antworten Sie auf eine Nachricht und @erwähnen Sie mich (`@bot`, `@bot fr:en`), verwenden Sie `/translate` oder klicken Sie mit der rechten Maustaste auf eine Nachricht und wählen Sie Apps, dann „Nachricht übersetzen“."
+  "help.usage": "Antworten Sie auf eine Nachricht und @erwähnen Sie mich (`@bot`, `@bot fr:en`), verwenden Sie `/translate` oder klicken Sie mit der rechten Maustaste auf eine Nachricht und wählen Sie Apps, dann „Nachricht übersetzen“.",
+  "help.flags": "Reagieren Sie auf eine Nachricht mit einer Länderflagge und ich poste sie in dieser Sprache für den Kanal. Flaggen, die eine Sprache teilen, sind eine Anfrage: {flags} fragen alle nach Englisch, also nur der erste Beitrag. Wenn ich keine Sprache für eine Flagge habe, antworte ich stattdessen mit einem Menü."
 }

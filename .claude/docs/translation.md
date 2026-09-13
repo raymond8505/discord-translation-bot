@@ -37,6 +37,8 @@ LibreTranslate's `/languages` and `/translate` expose them as `pt-BR`, `zh-Hans`
 pattern accepts `xx`, `xxx`, and `xx-Xxxx` forms.
 
 - `resolveTarget(locale, supported)`: table → bare prefix → `en`.
+- `resolveLanguageCode(code, supported)`: one table code → the first of its `codes` the backend
+  serves, else null. `src/flags.ts` maps flag emoji onto table codes and resolves them through it.
 - `menuLanguages(supported, uiLang)`: dedupes by backend code, named in `uiLang` and sorted by that
   name (≤ 50 for two menus).
 - `labelFor(code, uiLang)`: the table label for `en`; otherwise ICU's `Intl.DisplayNames` on the

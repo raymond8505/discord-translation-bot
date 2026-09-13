@@ -9,6 +9,7 @@
   "translate.noText": "Ese mensaje no tiene texto que traducir.",
   "mention.hint": "Responder al mensaje que quieres traducido y @mencióname. Añadir un idioma para seleccionar el objetivo (`@bot french`), o `source:target` para forzar la fuente también (`@bot fr:en`, `@bot fr:`).",
   "mention.unreadable": "No pude leer el mensaje que le contestaste.",
+  "reaction.unsupported": "No tengo un lenguaje para {flag}. Escoge un objetivo abajo.",
   "select.none": "No hay idioma seleccionado.",
   "select.expired": "El texto original ya no está disponible para traducir.",
   "reply.title": "Traducción",
@@ -29,5 +30,6 @@
   "cmd.help.description": "Listar los idiomas compatibles y sus códigos",
   "help.title": "Idiomas compatibles",
   "help.intro": "Utilice cualquier nombre o código debajo como el objetivo, o `source:target` para forzar la fuente también.",
-  "help.usage": "Responder a un mensaje y @mencióname (`@bot`, `@bot fr:en`), utilizar `/translate`, o hacer clic con el botón derecho en un mensaje y elegir aplicaciones, luego Traducir mensaje."
+  "help.usage": "Responder a un mensaje y @mencióname (`@bot`, `@bot fr:en`), utilizar `/translate`, o hacer clic con el botón derecho en un mensaje y elegir aplicaciones, luego Traducir mensaje.",
+  "help.flags": "Reaccione a un mensaje con una bandera de país y lo publique en ese idioma para el canal. Las banderas que comparten un idioma son una petición: {flags} todas piden inglés, así que sólo el primer post. Si no tengo lenguaje para una bandera, contesto con un menú en su lugar."
 }

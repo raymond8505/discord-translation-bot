@@ -8,6 +8,7 @@
 | "Translate Message" context menu | `src/commands/translateMessage.ts` | ephemeral |
 | `/tb-help` (supported languages and their codes) | `src/commands/help.ts` | ephemeral |
 | Reply + `@mention` (optional language hint) | `src/mentions.ts` (`MessageCreate`) | **public** |
+| Flag reaction (🇫🇷 on any message) | `src/reactions.ts` (`MessageReactionAdd`) | **public** |
 | Language select menus | `src/components/languageSelect.ts` | ephemeral (new message on a public reply; edit in place on an ephemeral one) |
 
 `src/interactions.ts` is the single `InteractionCreate` listener: it routes by the type guards
@@ -46,6 +47,23 @@ name. Replies use `allowedMentions: { repliedUser: false }`.
 (autocompleted) forces the source. A forced source bypasses the cache read and overwrites the entry
 (`src/translate.ts`), so it corrects a wrong detection for everyone.
 
+## Flag reactions
+
+`src/flags.ts` maps a region onto a code `LANGUAGES` already lists — 🇫🇷 and 🏴󠁧󠁢󠁥󠁮󠁧󠁿 decode to `FR` and
+`GBENG` from their regional indicators / tag sequence — and resolves it through
+`resolveLanguageCode()`, so a flag inherits the menus' preferred-first fallback and an install that
+never loaded the language resolves to null exactly like an unmapped country. Sub-regions collapse:
+every English-speaking flag is `en`, never `en-GB`. Anything that is not a region flag (👍, 🏴‍☠️, a
+custom emoji) is ignored in silence — the trigger must not answer every reaction in the guild.
+
+A flag with no language gets `buildLanguagePickerReply()`: the notice plus the ordinary target menus
+(`lang:t:0:auto:<messageId>`), so the pick runs through the select handler and the text comes back
+from `channel.messages.fetch`. Duplicates are judged **by language, not emoji** — `alreadyAsked()`
+sums the counts of every flag on the message resolving to the same code (all unservable flags share
+one bucket), and the handled reaction is itself in `message.reactions.cache`, so two means someone
+already asked. Reactions on the bot's own posts are skipped (their text lives in an embed);
+reaction *removal* does nothing.
+
 ## Menus and the customId scheme
 
 Every translation reply carries up to four select rows: two **source** menus (Auto-detect first,
@@ -62,6 +80,9 @@ expiry. Never put text in a customId.
 
 ## Intents and partials
 
-`Guilds`, `GuildMessages`, `MessageContent` (privileged — enable in the developer portal) and
-`Partials.Message`, without which edits/deletes of messages sent before boot never arrive and
-cache invalidation misses them. `oldMessage` in `messageUpdate` may be partial (`content: null`).
+`Guilds`, `GuildMessages`, `MessageContent` (privileged — enable in the developer portal),
+`GuildMessageReactions` (not privileged) and `Partials.Message`, `Partials.Reaction`,
+`Partials.User`, without which edits, deletes and reactions on messages sent before boot never
+arrive — cache invalidation misses them and a flag on older history does nothing. `oldMessage` in
+`messageUpdate` may be partial (`content: null`); a partial reaction and its partial message are
+fetched in `handleFlagReaction` before the text is read.

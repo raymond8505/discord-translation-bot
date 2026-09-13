@@ -1,0 +1,154 @@
+import type { AppContext } from "./context.js";
+import { isOperational, userMessageFor } from "./errors.js";
+import { isFlagEmoji, languageForFlag } from "./flags.js";
+import type { Translator } from "./i18n/index.js";
+import {
+  buildLanguagePickerReply,
+  buildNoticeReply,
+  buildTranslationReply,
+  type ReplyPayload,
+} from "./reply.js";
+import { sourceIdForMessage } from "./sourceId.js";
+import { AUTO_SOURCE, translateWithCache } from "./translate.js";
+
+/** The slice of `MessageReaction` every reaction on the message is read through. */
+export interface ReactionSummary {
+  readonly emoji: { readonly name: string | null };
+  /** Null on a partial reaction; counted as the single reaction we know of. */
+  readonly count: number | null;
+}
+
+/** The slice of `Message` / `PartialMessage` the trigger touches. */
+export interface ReactedMessage {
+  readonly id: string;
+  readonly partial: boolean;
+  readonly content: string | null;
+  readonly author: { readonly id: string } | null;
+  readonly client: { readonly user: { readonly id: string } | null };
+  readonly guild: { readonly preferredLocale: string } | null;
+  readonly reactions: { readonly cache: ReadonlyMap<string, ReactionSummary> };
+  fetch(): Promise<ReactedMessage>;
+  reply(options: ReplyPayload & { allowedMentions: { repliedUser: boolean } }): Promise<unknown>;
+}
+
+export interface FlagReaction extends ReactionSummary {
+  readonly partial: boolean;
+  readonly message: ReactedMessage;
+  fetch(): Promise<FlagReaction>;
+}
+
+export interface ReactingUser {
+  readonly bot: boolean;
+}
+
+/** Every flag the bot can't serve shares one bucket: one menu per message, not one per flag. */
+const UNSUPPORTED_BUCKET = "unsupported";
+
+/**
+ * The flag-reaction trigger: react 🇫🇷 to a message and the bot posts it in
+ * French for the channel. Public like the mention trigger — a reaction is not
+ * an interaction, so there is no ephemeral reply to give, and the menus on the
+ * post answer each clicker privately anyway. A reaction carries no user
+ * locale, so the reply is worded in the guild's preferred language.
+ *
+ * Reactions that are not flags are ignored in silence; a flag the bot has no
+ * language for gets the menus instead, so nothing is left unanswered.
+ */
+export async function handleFlagReaction(
+  ctx: AppContext,
+  reaction: FlagReaction,
+  user: ReactingUser,
+): Promise<void> {
+  if (user.bot) return;
+  if (!isFlagEmoji(reaction.emoji.name ?? "")) return;
+
+  let full: FlagReaction;
+  let message: ReactedMessage;
+  try {
+    // Reactions on messages sent before boot arrive partial, text and all.
+    full = reaction.partial ? await reaction.fetch() : reaction;
+    message = full.message.partial ? await full.message.fetch() : full.message;
+  } catch (err) {
+    ctx.log.warn("flag reaction: reaction or message could not be fetched", err);
+    return;
+  }
+
+  // The bot's own replies keep their text in an embed, so a flag on one could only ever say "no text".
+  const self = message.client.user?.id;
+  if (self !== undefined && message.author?.id === self) return;
+
+  const tr = ctx.i18n.forLocale(message.guild?.preferredLocale ?? "");
+  try {
+    await translateForFlag(ctx, message, full.emoji.name ?? "", tr);
+  } catch (err) {
+    if (isOperational(err)) ctx.log.warn("flag reaction: backend failure", err);
+    else ctx.log.error("flag reaction: unexpected failure", err);
+    await replyQuietly(message, buildNoticeReply(userMessageFor(err, tr)));
+  }
+}
+
+async function translateForFlag(
+  ctx: AppContext,
+  message: ReactedMessage,
+  emoji: string,
+  tr: Translator,
+): Promise<void> {
+  const supported = await ctx.languages.get();
+  const target = languageForFlag(emoji, supported);
+  if (alreadyAsked(message, target, supported)) return;
+
+  const sourceId = sourceIdForMessage(message.id);
+  if (target === null) {
+    await replyQuietly(
+      message,
+      buildLanguagePickerReply({
+        sourceId,
+        supported,
+        tr,
+        notice: tr.t("reaction.unsupported", { flag: emoji }),
+      }),
+    );
+    return;
+  }
+
+  const text = message.content ?? "";
+  if (!text.trim()) {
+    await replyQuietly(message, buildNoticeReply(tr.t("translate.noText")));
+    return;
+  }
+
+  const outcome = await translateWithCache(ctx, { sourceId, text, target });
+  await replyQuietly(
+    message,
+    buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
+  );
+}
+
+/**
+ * Whether the message already carries a flag asking for the same thing. The
+ * bucket is the language, not the emoji: 🇺🇸 on a message someone already
+ * flagged 🇬🇧 wants the English translation that is already in the channel. The
+ * reaction being handled is itself in the cache, so one ask is the normal case
+ * and two means somebody got there first.
+ */
+function alreadyAsked(
+  message: ReactedMessage,
+  target: string | null,
+  supported: ReadonlySet<string>,
+): boolean {
+  const bucket = target ?? UNSUPPORTED_BUCKET;
+  let asks = 0;
+  for (const other of message.reactions.cache.values()) {
+    const name = other.emoji.name ?? "";
+    if (!isFlagEmoji(name)) continue;
+    if ((languageForFlag(name, supported) ?? UNSUPPORTED_BUCKET) !== bucket) continue;
+    asks += other.count ?? 1;
+    if (asks > 1) return true;
+  }
+  return false;
+}
+
+/** Replies without pinging the author; they wrote the message, they didn't ask for this. */
+function replyQuietly(message: ReactedMessage, payload: ReplyPayload): Promise<unknown> {
+  return message.reply({ ...payload, allowedMentions: { repliedUser: false } });
+}

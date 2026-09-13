@@ -8,13 +8,19 @@ LibreTranslate (Argos models, entirely local, no third-party API).
 
 | Trigger | How | Reply |
 | --- | --- | --- |
+| React to a message with a country flag | 🇫🇷 🇩🇪 🇯🇵 … | Public reply with the translation and source/target menus |
 | Reply to a message and `@mention` the bot | `@bot`, `@bot french`, `@bot fr:en` | Public reply with the translation and source/target menus |
 | Right-click a message → Apps → **Translate Message** | context menu | Ephemeral (only you see it) |
 | `/translate text:<text> [target] [source]` | slash command, both language options autocomplete | Ephemeral |
 | `/tb-help` | lists every supported language with the code `target:` and `@bot <code>` accept | Ephemeral |
 
 - Target language defaults to your Discord client language (slash / context
-  menu) or the server's preferred locale (mention trigger).
+  menu) or the server's preferred locale (mention and flag triggers).
+- Flags that share a language are one request: 🇬🇧 🇺🇸 🇨🇦 🇦🇺 and 🏴󠁧󠁢󠁥󠁮󠁧󠁿 all ask
+  for English, and only the first flag for a language posts a translation.
+  A flag for a language this install doesn't serve — or a country with no
+  language in the table — gets a reply saying so, with the target menus to
+  pick by hand. Reactions that aren't flags are ignored.
 - Source language is auto-detected and the reply shows the detection
   confidence. Below 50% the reply says so and how to force it: `@bot fr:en`
   (source:target), `@bot fr:` (source only), or `/translate` with `source:`.
@@ -338,3 +344,7 @@ it in `.env` locally, or edit the literal in the `.env` heredoc of
   reports them as `pt-BR`, `zh-Hans`, `zh-Hant`.
 - **No response to @mention** — the tagging message must be a *reply*, and
   the Message Content intent must be enabled in the developer portal.
+- **No response to a flag** — someone else's flag for the same language is
+  already on the message (only the first posts), the emoji is a custom one
+  rather than a country flag, or the message is one of the bot's own. Flag
+  reactions need no portal change: the reactions intent is not privileged.

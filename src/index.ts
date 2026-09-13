@@ -11,6 +11,7 @@ import { createMessageInvalidator } from "./invalidation.js";
 import { createSupportedLanguages } from "./languages.js";
 import { log } from "./log.js";
 import { handleMentionMessage } from "./mentions.js";
+import { handleFlagReaction } from "./reactions.js";
 import { registerCommands } from "./registerCommands.js";
 
 const SHUTDOWN_GRACE_MS = 5_000;
@@ -36,9 +37,16 @@ async function main(): Promise<void> {
 
   const client = new Client({
     // MessageContent is privileged: enable it in the developer portal or login rejects.
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
-    // Edits and deletes of messages sent before boot arrive as partials; without this they are dropped.
-    partials: [Partials.Message],
+    // GuildMessageReactions (the flag trigger) is not, and needs no portal change.
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMessageReactions,
+    ],
+    // Edits, deletes and reactions on messages sent before boot arrive as partials;
+    // without these they are dropped, and cache invalidation and flags miss them.
+    partials: [Partials.Message, Partials.Reaction, Partials.User],
   });
 
   const heartbeat = startHeartbeat(client);
@@ -63,6 +71,7 @@ async function main(): Promise<void> {
 
   client.on(Events.InteractionCreate, createInteractionHandler(ctx));
   client.on(Events.MessageCreate, (message) => void handleMentionMessage(ctx, message));
+  client.on(Events.MessageReactionAdd, (reaction, user) => void handleFlagReaction(ctx, reaction, user));
   client.on(Events.MessageUpdate, (oldMessage, newMessage) => void invalidator.onUpdate(oldMessage, newMessage));
   client.on(Events.MessageDelete, (message) => void invalidator.onDelete(message));
 

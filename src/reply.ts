@@ -110,6 +110,38 @@ export function buildNoticeReply(message: string): ReplyPayload {
   };
 }
 
+export interface LanguagePickerInput {
+  readonly sourceId: string;
+  readonly supported: ReadonlySet<string>;
+  readonly tr: Translator;
+  readonly notice: string;
+}
+
+/**
+ * A notice with the target menus under it, for when the bot knows the message
+ * but not the language that was asked for (a flag it can't serve). Nothing is
+ * preselected — there is no current target to keep — and the customIds are the
+ * ordinary ones, so the pick goes through the same select handler and the text
+ * comes back from the cache or a message re-fetch.
+ */
+export function buildLanguagePickerReply(input: LanguagePickerInput): ReplyPayload {
+  const { sourceId, supported, tr, notice } = input;
+  const languages = menuLanguages(supported, tr.language);
+  if (languages.length === 0) return buildNoticeReply(notice);
+
+  return {
+    embeds: [new EmbedBuilder().setDescription(notice)],
+    components: buildMenus({
+      role: "target",
+      languages,
+      selected: "",
+      other: AUTO_VALUE,
+      sourceId,
+      placeholder: `${tr.t("menu.to")}…`,
+    }),
+  };
+}
+
 interface MenuSpec {
   readonly role: SelectRole;
   readonly languages: readonly MenuLanguage[];

@@ -1,6 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { BackendError } from "../backends/index.js";
+import { exampleSharedFlags } from "../flags.js";
 import { makeFakeBackend } from "../fixtures/backend.fixture.js";
 import { makeContext } from "../fixtures/context.fixture.js";
 import { lastReplyDescription, lastReplyPayload, makeHelpInteraction } from "../fixtures/interaction.fixture.js";
@@ -31,6 +32,18 @@ describe("handleHelp", () => {
     }
     expect(lastReplyPayload(interaction)?.embeds[0]?.toJSON().title).toBe("Supported languages");
     expect(lastReplyPayload(interaction)?.components).toEqual([]);
+  });
+
+  it("explains the flag reaction under the language list", async () => {
+    const ctx = makeContext();
+    const interaction = makeHelpInteraction();
+
+    await handleHelp(ctx, interaction);
+
+    const description = lastReplyDescription(interaction) ?? "";
+    expect(description).toMatch(/React to a message with a country flag/);
+    expect(description).toContain(exampleSharedFlags());
+    expect(description.indexOf("country flag")).toBeGreaterThan(description.indexOf("**English** · `en`"));
   });
 
   it("names the languages and words the page in the user's Discord language", async () => {

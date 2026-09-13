@@ -23,6 +23,7 @@ image.
 | `messages.fixture.ts` | `makeMessages()` — the real `en` plus a partial `fr` (`frenchMessages`), `zh-Hans` without `zh-Hant`, and `nb`; `makeContext()` builds its `i18n` from it so handler tests never depend on generated files |
 | `interaction.fixture.ts` | chat-input / autocomplete / context-menu / help / select fakes with a `calls` log, `lastReplyDescription()`; each takes the `locale` its handler reads |
 | `message.fixture.ts` | `makeMentionMessage()` for the mention trigger |
+| `reaction.fixture.ts` | `makeFlagReaction()` (siblings seed `reactions.cache` for the duplicate rule; `fetchCalls` proves the partial path), `makeReactingUser()`, and the `FLAGS` / `NON_FLAGS` emoji written as escapes |
 
 ## Patterns
 

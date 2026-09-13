@@ -1,5 +1,6 @@
 import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { AppContext } from "../context.js";
+import { exampleSharedFlags } from "../flags.js";
 import { COMMAND_DESCRIPTION_MAX, localizationsFor } from "../i18n/discord.js";
 import { staticI18n } from "../i18n/index.js";
 import { menuLanguages } from "../locale.js";
@@ -30,7 +31,8 @@ export async function handleHelp(ctx: AppContext, interaction: HelpInteraction):
 
   const supported = await ctx.languages.get();
   const lines = menuLanguages(supported, tr.language).map((lang) => `**${lang.label}** · \`${lang.code}\``);
-  const description = [tr.t("help.intro"), "", ...lines, "", tr.t("help.usage")].join("\n");
+  const flags = tr.t("help.flags", { flags: exampleSharedFlags() });
+  const description = [tr.t("help.intro"), "", ...lines, "", tr.t("help.usage"), "", flags].join("\n");
 
   const embed = new EmbedBuilder()
     .setTitle(tr.t("help.title"))
