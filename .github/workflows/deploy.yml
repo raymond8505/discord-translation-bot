@@ -100,6 +100,11 @@ jobs:
               echo "LT_URL=http://libretranslate:5000"
               echo "BACKEND=libretranslate"
               echo "CACHE_TTL_SECONDS=2592000"
+              # Argos model codes (pb = pt-BR), matching the committed locale
+              # files in src/i18n/messages. Omitting this loads all ~100
+              # models: ~10 GB of disk and far more RAM than the bot serves
+              # languages for.
+              echo "LT_LOAD_ONLY=en,es,fr,de,nl,pt,pb"
             } > .env
 
             docker compose up -d --build --remove-orphans

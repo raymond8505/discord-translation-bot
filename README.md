@@ -74,9 +74,13 @@ yarn docker:up        # docker compose up --build -d — same file the VPS runs
 yarn docker:logs      # follow the bot's log
 ```
 
-`.env.example` sets `LT_LOAD_ONLY=en,es,fr,de` so LibreTranslate downloads
-only those models (a few hundred MB). Change the list to what you need to
-test; leave it **unset** on the VPS for the full set.
+`.env.example` sets `LT_LOAD_ONLY=en,es,fr,de,nl,pt,pb` so LibreTranslate
+downloads only those models. That is the same list the deploy writes on the
+VPS, and it matches the committed locale files in `src/i18n/messages`. The
+codes are Argos spellings — `pb` is Brazilian Portuguese, which
+`/languages` reports back as `pt-BR`. Add a code here to test a language the
+bot does not ship messages for; leaving the variable out entirely loads all
+~100 models (~10 GB).
 
 Compose shortcuts (all in `package.json`):
 
@@ -260,11 +264,17 @@ to check the secrets — push an empty commit instead:
 git commit --allow-empty -m "chore: trigger deploy" && git push
 ```
 
-**First deploy:** LibreTranslate downloads ~10 GB of models into the
-`lt-models` volume. The deploy does not wait for it; the bot comes up and
-answers "still starting up" until the models are loaded (watch
+**First deploy:** LibreTranslate downloads the models named by `LT_LOAD_ONLY`
+into the `lt-models` volume. The deploy does not wait for it; the bot comes up
+and answers "still starting up" until they are loaded (watch
 `docker compose logs -f libretranslate`; the container turns healthy when
-done). VPS sizing: 16 GB RAM / 160 GB disk comfortably covers the full set.
+done). The seven-language default is a few hundred MB and a minute or two.
+
+Widening that list costs both disk and RAM — the full ~100-model set is ~10 GB
+on disk, and Argos loads each model lazily as it is used, so resident memory
+grows with the languages actually translated. On a VPS shared with other
+containers, check free memory before adding languages; with no swap configured,
+exhausting it means the kernel OOM-kills a container rather than degrading.
 
 The bot has no HTTP port. Its Docker health check reads the mtime of a
 heartbeat file the process touches every 30 s while its gateway session is
