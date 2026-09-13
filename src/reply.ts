@@ -14,7 +14,7 @@ import type { Translator } from "./i18n/index.js";
 import { labelFor, menuLanguages, type MenuLanguage } from "./locale.js";
 
 /** Discord limits: embed description length, options per select menu, rows per message (5). */
-const EMBED_DESCRIPTION_MAX = 4096;
+export const EMBED_DESCRIPTION_MAX = 4096;
 const OPTIONS_PER_MENU = 25;
 const MENUS_PER_ROLE = 2;
 

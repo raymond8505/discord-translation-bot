@@ -1,4 +1,5 @@
 import { MessageFlags, type Interaction } from "discord.js";
+import { HELP_COMMAND_NAME, handleHelp } from "./commands/help.js";
 import { TRANSLATE_COMMAND_NAME, handleTranslate, handleTranslateAutocomplete } from "./commands/translate.js";
 import { TRANSLATE_MESSAGE_COMMAND_NAME, handleTranslateMessage } from "./commands/translateMessage.js";
 import { isSelectCustomId } from "./components/customId.js";
@@ -24,6 +25,7 @@ export function createInteractionHandler(ctx: AppContext): (interaction: Interac
 async function route(ctx: AppContext, interaction: Interaction): Promise<void> {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === TRANSLATE_COMMAND_NAME) return handleTranslate(ctx, interaction);
+    if (interaction.commandName === HELP_COMMAND_NAME) return handleHelp(ctx, interaction);
     ctx.log.warn(`unknown slash command ${interaction.commandName}`);
     return;
   }

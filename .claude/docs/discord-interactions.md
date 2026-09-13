@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | `/translate text: [target]` | `src/commands/translate.ts` | ephemeral |
 | "Translate Message" context menu | `src/commands/translateMessage.ts` | ephemeral |
+| `/help` (supported languages and their codes) | `src/commands/help.ts` | ephemeral |
 | Reply + `@mention` (optional language hint) | `src/mentions.ts` (`MessageCreate`) | **public** |
 | Language select menus | `src/components/languageSelect.ts` | ephemeral (new message on a public reply; edit in place on an ephemeral one) |
 

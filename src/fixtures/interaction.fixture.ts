@@ -1,4 +1,5 @@
 import { MessageFlags } from "discord.js";
+import type { HelpInteraction } from "../commands/help.js";
 import type { TranslateAutocompleteInteraction, TranslateInteraction } from "../commands/translate.js";
 import type { TranslateMessageInteraction } from "../commands/translateMessage.js";
 import type { LanguageSelectInteraction } from "../components/languageSelect.js";
@@ -52,6 +53,20 @@ export function makeAutocompleteInteraction(
     options: { getFocused: () => focused },
     async respond(choices) {
       calls.push({ method: "respond", payload: choices });
+    },
+  };
+}
+
+export function makeHelpInteraction(locale = "en-US"): HelpInteraction & ResponseLog {
+  const calls: ResponseLog["calls"] = [];
+  return {
+    calls,
+    locale,
+    async deferReply(payload) {
+      calls.push({ method: "deferReply", payload });
+    },
+    async editReply(payload: ReplyPayload) {
+      calls.push({ method: "editReply", payload });
     },
   };
 }

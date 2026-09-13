@@ -6,7 +6,9 @@ import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { makeContext } from "./fixtures/context.fixture.js";
 import {
   MESSAGE_ID,
+  lastReplyDescription,
   makeChatInputInteraction,
+  makeHelpInteraction,
   makeMessageContextInteraction,
   makeSelectInteraction,
   type ResponseLog,
@@ -73,6 +75,16 @@ describe("createInteractionHandler", () => {
     expect(chat.calls.at(-1)?.method).toBe("editReply");
     expect(context.calls.at(-1)?.method).toBe("editReply");
     expect(select.calls.at(-1)?.method).toBe("editReply");
+  });
+
+  it("routes /help", async () => {
+    const ctx = makeContext();
+    const help = makeHelpInteraction();
+
+    await createInteractionHandler(ctx)(asInteraction("chat", help, { commandName: "help" }));
+
+    expect(lastReplyDescription(help)).toContain("`fr`");
+    expect(ctx.backend.translateCalls).toHaveLength(0);
   });
 
   it("logs and ignores commands it does not know", async () => {

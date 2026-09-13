@@ -11,6 +11,7 @@ LibreTranslate (Argos models, entirely local, no third-party API).
 | Reply to a message and `@mention` the bot | `@bot`, `@bot french`, `@bot fr:en` | Public reply with the translation and source/target menus |
 | Right-click a message → Apps → **Translate Message** | context menu | Ephemeral (only you see it) |
 | `/translate text:<text> [target] [source]` | slash command, both language options autocomplete | Ephemeral |
+| `/help` | lists every supported language with the code `target:` and `@bot <code>` accept | Ephemeral |
 
 - Target language defaults to your Discord client language (slash / context
   menu) or the server's preferred locale (mention trigger).
