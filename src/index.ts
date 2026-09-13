@@ -5,6 +5,7 @@ import { createCache } from "./cache.js";
 import type { AppContext } from "./context.js";
 import { loadEnv } from "./env.js";
 import { startHeartbeat } from "./health.js";
+import { createI18n } from "./i18n/index.js";
 import { createInteractionHandler } from "./interactions.js";
 import { createMessageInvalidator } from "./invalidation.js";
 import { createSupportedLanguages } from "./languages.js";
@@ -29,6 +30,7 @@ async function main(): Promise<void> {
     backend,
     cache: createCache(redis, env.CACHE_TTL_SECONDS),
     languages: createSupportedLanguages(backend),
+    i18n: createI18n(),
     log,
   };
 

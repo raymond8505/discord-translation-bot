@@ -1,9 +1,11 @@
 import { createCache } from "../cache.js";
 import type { AppContext } from "../context.js";
+import { createI18n } from "../i18n/index.js";
 import { createSupportedLanguages } from "../languages.js";
 import type { Logger } from "../log.js";
 import { makeFakeBackend, type FakeBackend } from "./backend.fixture.js";
 import { makeEnv } from "./env.fixture.js";
+import { makeMessages } from "./messages.fixture.js";
 import { makeFakeRedis, type FakeRedis } from "./redis.fixture.js";
 
 export interface RecordingLogger extends Logger {
@@ -45,5 +47,6 @@ export function makeContext(options: TestContextOptions = {}): TestContext {
     log,
     cache: createCache(redis, env.CACHE_TTL_SECONDS, log),
     languages: createSupportedLanguages(backend, log),
+    i18n: createI18n(makeMessages()),
   };
 }
