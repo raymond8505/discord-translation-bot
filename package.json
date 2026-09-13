@@ -18,6 +18,7 @@
     "docker:up": "docker compose up --build -d",
     "docker:down": "docker compose down",
     "docker:restart": "docker compose up --build -d --force-recreate bot",
+    "docker:restart:lt": "docker compose up -d --force-recreate libretranslate",
     "docker:watch": "docker compose watch",
     "docker:logs": "docker compose logs -f bot",
     "docker:logs:all": "docker compose logs -f",

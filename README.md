@@ -74,6 +74,7 @@ Compose shortcuts (all in `package.json`):
 | `yarn docker:up` | `docker compose up --build -d` |
 | `yarn docker:down` | `docker compose down` (keeps the model and Redis volumes) |
 | `yarn docker:restart` | rebuild and recreate only the bot container |
+| `yarn docker:restart:lt` | recreate libretranslate (picks up a changed `LT_LOAD_ONLY`; new models download on boot) |
 | `yarn docker:watch` | rebuild the bot image on changes under `src/` |
 | `yarn docker:logs` / `docker:logs:all` | follow the bot's log / every service |
 | `yarn docker:ps` | container status and health |
