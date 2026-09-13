@@ -85,6 +85,15 @@ describe("menuLanguages", () => {
   it("fits within two 25-option select menus", () => {
     expect(menuLanguages(supported).length).toBeLessThanOrEqual(50);
   });
+
+  it("names and sorts the languages in the requested language", () => {
+    const menu = menuLanguages(supported, "fr");
+    const labels = menu.map((m) => m.label);
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b, "fr")));
+    expect(menu).toContainEqual({ code: "de", label: "Allemand" });
+    expect(menu).toContainEqual({ code: "zh-Hant", label: "Chinois (traditionnel)" });
+    expect(labels[0]).not.toBe(menuLanguages(supported).map((m) => m.label)[0]);
+  });
 });
 
 describe("labelFor", () => {
@@ -97,6 +106,21 @@ describe("labelFor", () => {
 
   it("returns the code itself when unknown", () => {
     expect(labelFor("ar")).toBe("ar");
+  });
+
+  it.each([
+    ["de", "fr", "Allemand"],
+    ["zt", "de", "Chinesisch (Traditionell)"],
+    ["pb", "ja", "ポルトガル語 (ブラジル)"],
+    ["nb", "en", "Norwegian"],
+  ])("names %s in %s as %s", (code, uiLang, label) => {
+    expect(labelFor(code, uiLang)).toBe(label);
+  });
+
+  it("never throws for a value ICU cannot name", () => {
+    expect(labelFor("auto", "fr")).toBe("auto");
+    expect(labelFor("t_0123456789abcdef", "de")).toBe("t_0123456789abcdef");
+    expect(labelFor("de", "not a locale")).toBe("German");
   });
 });
 
@@ -127,6 +151,17 @@ describe("parseLanguageHint", () => {
   it("returns null when the named language is unsupported", () => {
     expect(parseLanguageHint("croatian", supported)).toBeNull();
   });
+
+  it.each([
+    ["allemand", "fr", "de"],
+    ["to Allemand", "fr", "de"],
+    ["chinois", "fr", "zh-Hans"],
+    ["chinois (traditionnel)", "fr", "zh-Hant"],
+    ["german", "fr", "de"],
+    ["日本語", "ja", "ja"],
+  ])("reads %j in %s as %s", (text, uiLang, code) => {
+    expect(parseLanguageHint(text, supported, uiLang)).toBe(code);
+  });
 });
 
 describe("parseLanguageSpec", () => {
@@ -141,6 +176,10 @@ describe("parseLanguageSpec", () => {
     ["", null, null],
   ])("reads %j as source %s → target %s", (text, source, target) => {
     expect(parseLanguageSpec(text, supported)).toEqual({ source, target, unresolved: [] });
+  });
+
+  it("accepts localized names on either side", () => {
+    expect(parseLanguageSpec("allemand:anglais", supported, "fr")).toEqual({ source: "de", target: "en", unresolved: [] });
   });
 
   it("reports the parts it cannot resolve", () => {

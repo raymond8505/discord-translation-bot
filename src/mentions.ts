@@ -1,6 +1,7 @@
 import type { MessageMentionsHasOptions } from "discord.js";
 import type { AppContext } from "./context.js";
 import { isOperational, userMessageFor } from "./errors.js";
+import type { Translator } from "./i18n/index.js";
 import { parseLanguageSpec, resolveTarget } from "./locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "./reply.js";
 import { sourceIdForMessage } from "./sourceId.js";
@@ -28,35 +29,33 @@ const MENTION_OPTIONS: MessageMentionsHasOptions = {
   ignoreRepliedUser: true,
 };
 
-const HINT_REPLY =
-  "Reply to the message you want translated and @mention me. Add a language to pick the target " +
-  "(`@bot french`), or `source:target` to force the source too (`@bot fr:en`, `@bot fr:`).";
-
 const USER_MENTION = /<@!?\d+>/g;
 
 /**
  * The reply-and-mention trigger: `@bot [language]` posted as a reply
  * translates the replied-to message for everyone in the channel. Public by
  * necessity (only interactions can be ephemeral); the menus on the reply
- * answer each clicker privately.
+ * answer each clicker privately. A message carries no user locale, so the
+ * reply is worded in the guild's preferred language.
  */
 export async function handleMentionMessage(ctx: AppContext, message: MentionMessage): Promise<void> {
   if (message.author.bot) return;
   const bot = message.client.user;
   if (!bot || !message.mentions.has(bot.id, MENTION_OPTIONS)) return;
 
+  const tr = ctx.i18n.forLocale(message.guild?.preferredLocale ?? "");
   try {
-    await translateParent(ctx, message);
+    await translateParent(ctx, message, tr);
   } catch (err) {
     if (isOperational(err)) ctx.log.warn("mention trigger: backend failure", err);
     else ctx.log.error("mention trigger: unexpected failure", err);
-    await replyQuietly(message, buildNoticeReply(userMessageFor(err)));
+    await replyQuietly(message, buildNoticeReply(userMessageFor(err, tr)));
   }
 }
 
-async function translateParent(ctx: AppContext, message: MentionMessage): Promise<void> {
+async function translateParent(ctx: AppContext, message: MentionMessage, tr: Translator): Promise<void> {
   if (!message.reference?.messageId) {
-    await replyQuietly(message, buildNoticeReply(HINT_REPLY));
+    await replyQuietly(message, buildNoticeReply(tr.t("mention.hint")));
     return;
   }
 
@@ -64,20 +63,23 @@ async function translateParent(ctx: AppContext, message: MentionMessage): Promis
   try {
     parent = await message.fetchReference();
   } catch {
-    await replyQuietly(message, buildNoticeReply("I couldn't read the message you replied to."));
+    await replyQuietly(message, buildNoticeReply(tr.t("mention.unreadable")));
     return;
   }
   if (!parent.content.trim()) {
-    await replyQuietly(message, buildNoticeReply("That message has no text to translate."));
+    await replyQuietly(message, buildNoticeReply(tr.t("translate.noText")));
     return;
   }
 
   const supported = await ctx.languages.get();
   const hint = message.content.replace(USER_MENTION, " ");
-  const spec = parseLanguageSpec(hint, supported);
+  const spec = parseLanguageSpec(hint, supported, tr.language);
   // Free chat around the mention is fine; only the explicit colon form is strict.
   if (hint.includes(":") && spec.unresolved.length > 0) {
-    await replyQuietly(message, buildNoticeReply(`I don't know a language called "${spec.unresolved[0]}".`));
+    await replyQuietly(
+      message,
+      buildNoticeReply(tr.t("translate.unknownLanguage", { name: spec.unresolved[0] ?? "" })),
+    );
     return;
   }
   const target = spec.target ?? resolveTarget(message.guild?.preferredLocale ?? "", supported);
@@ -91,7 +93,7 @@ async function translateParent(ctx: AppContext, message: MentionMessage): Promis
   });
   await replyQuietly(
     message,
-    buildTranslationReply({ ...outcome, sourceId, source: spec.source ?? AUTO_SOURCE, supported }),
+    buildTranslationReply({ ...outcome, sourceId, source: spec.source ?? AUTO_SOURCE, supported, tr }),
   );
 }
 

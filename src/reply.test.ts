@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { parseSelectCustomId } from "./components/customId.js";
 import { makeCacheEntry } from "./fixtures/cache.fixture.js";
 import { makeSupported } from "./fixtures/languages.fixture.js";
+import { frenchMessages, makeMessages } from "./fixtures/messages.fixture.js";
+import { createI18n } from "./i18n/index.js";
 import { menuLanguages } from "./locale.js";
-import { buildNoticeReply, buildTranslationReply } from "./reply.js";
+import { buildNoticeReply, buildTranslationReply, truncate } from "./reply.js";
 
 const ID = "123456789012345678";
 const supported = makeSupported();
+const i18n = createI18n(makeMessages());
 
 function build(overrides: Partial<Parameters<typeof buildTranslationReply>[0]> = {}) {
   return buildTranslationReply({
@@ -17,6 +20,7 @@ function build(overrides: Partial<Parameters<typeof buildTranslationReply>[0]> =
     cached: false,
     sameLanguage: false,
     supported,
+    tr: i18n.forLocale("en-US"),
     ...overrides,
   });
 }
@@ -107,6 +111,25 @@ describe("buildTranslationReply", () => {
   it("omits every menu when the backend has reported no languages yet", () => {
     // A lone "Auto-detect" option would be no choice at all.
     expect(build({ supported: new Set() }).components).toEqual([]);
+  });
+
+  it("words the reply and names the languages in the reader's language", () => {
+    const reply = build({ tr: i18n.forLocale("fr"), entry: makeCacheEntry({ source_lang: "es" }) });
+    const embed = reply.embeds[0]?.toJSON();
+    const all = menus(reply);
+
+    expect(embed?.title).toBe(`${frenchMessages["reply.title"]} → Anglais`);
+    expect(embed?.footer?.text).toContain("source : Espagnol");
+    expect(all[0]?.options[0]?.label).toBe(frenchMessages["menu.auto"]);
+    expect(all.find((m) => m.id?.role === "target")?.placeholder).toMatch(/^Traduire vers…/);
+    expect(all.flatMap((m) => m.options.map((o) => o.label))).toContain("Allemand");
+  });
+});
+
+describe("truncate", () => {
+  it("keeps short text and ends cut text with an ellipsis within the limit", () => {
+    expect(truncate("abc", 3)).toBe("abc");
+    expect(truncate("abcd", 3)).toBe("ab…");
   });
 });
 

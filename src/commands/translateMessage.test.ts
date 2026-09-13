@@ -8,6 +8,7 @@ import {
   lastReplyDescription,
   makeMessageContextInteraction,
 } from "../fixtures/interaction.fixture.js";
+import { frenchMessages } from "../fixtures/messages.fixture.js";
 import { handleTranslateMessage, translateMessageCommand } from "./translateMessage.js";
 
 describe("translateMessageCommand", () => {
@@ -39,11 +40,20 @@ describe("handleTranslateMessage", () => {
 
   it("replies with a notice when the message has no text", async () => {
     const ctx = makeContext();
-    const interaction = makeMessageContextInteraction({ content: "" });
+    const interaction = makeMessageContextInteraction({ content: "", locale: "en-US" });
 
     await handleTranslateMessage(ctx, interaction);
 
     expect(lastReplyDescription(interaction)).toBe("That message has no text to translate.");
     expect(ctx.backend.translateCalls).toHaveLength(0);
+  });
+
+  it("words the notice in the user's Discord language", async () => {
+    const ctx = makeContext();
+    const interaction = makeMessageContextInteraction({ content: "", locale: "fr" });
+
+    await handleTranslateMessage(ctx, interaction);
+
+    expect(lastReplyDescription(interaction)).toBe(frenchMessages["translate.noText"]);
   });
 });

@@ -1,21 +1,27 @@
 import { BackendError } from "./backends/index.js";
+import type { MessageKey, Translator } from "./i18n/index.js";
 
-/** User-facing wording for a failed translation, keyed on the backend error kind. */
-export function userMessageFor(err: unknown): string {
+/** The message key for a failed translation, keyed on the backend error kind. */
+export function errorKeyFor(err: unknown): MessageKey {
   if (err instanceof BackendError) {
     switch (err.kind) {
       case "network":
       case "http":
-        return "The translation service is still starting up or is unavailable. Try again in a few minutes.";
+        return "error.network";
       case "timeout":
-        return "The translation service took too long to respond. Try again shortly.";
+        return "error.timeout";
       case "unavailable":
-        return "The configured translation backend is not available.";
+        return "error.unavailable";
       case "invalid_response":
-        return "The translation service returned something I couldn't read.";
+        return "error.invalidResponse";
     }
   }
-  return "Something went wrong while translating. Please try again.";
+  return "error.generic";
+}
+
+/** User-facing wording for a failed translation, in the reader's language. */
+export function userMessageFor(err: unknown, tr: Translator): string {
+  return tr.t(errorKeyFor(err));
 }
 
 /** Backend errors are operational (expected while LibreTranslate warms up); anything else is a bug. */

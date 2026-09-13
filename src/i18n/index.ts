@@ -48,3 +48,6 @@ export function createI18n(table: MessageTable = generatedMessages): I18n {
     },
   };
 }
+
+/** The real table, for module-level builders (command definitions) that run before any AppContext exists. */
+export const staticI18n: I18n = createI18n();

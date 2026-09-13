@@ -7,6 +7,7 @@ import { AUTO_VALUE, parseSelectCustomId } from "./customId.js";
 
 /** The slice of `StringSelectMenuInteraction` the handler touches. */
 export interface LanguageSelectInteraction {
+  readonly locale: string;
   readonly customId: string;
   readonly values: readonly string[];
   readonly message: { readonly flags: { has(flag: MessageFlags): boolean } };
@@ -17,8 +18,6 @@ export interface LanguageSelectInteraction {
   deferReply(options: { flags: MessageFlags.Ephemeral }): Promise<unknown>;
   editReply(payload: ReplyPayload): Promise<unknown>;
 }
-
-const EXPIRED = "The original text is no longer available to translate.";
 
 /**
  * Re-translates after a menu pick. A source menu forces (or un-forces) the
@@ -44,9 +43,10 @@ export async function handleLanguageSelect(
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   }
 
+  const tr = ctx.i18n.forLocale(interaction.locale);
   const picked = interaction.values[0];
   if (!picked) {
-    await interaction.editReply(buildNoticeReply("No language selected."));
+    await interaction.editReply(buildNoticeReply(tr.t("select.none")));
     return;
   }
   const source = parsed.role === "source" ? picked : parsed.other;
@@ -54,7 +54,7 @@ export async function handleLanguageSelect(
 
   const text = await resolveSourceText(ctx, interaction, parsed.sourceId);
   if (text === null) {
-    await interaction.editReply(buildNoticeReply(EXPIRED));
+    await interaction.editReply(buildNoticeReply(tr.t("select.expired")));
     return;
   }
 
@@ -62,7 +62,7 @@ export async function handleLanguageSelect(
   const forced = source === AUTO_VALUE ? undefined : source;
   const outcome = await translateWithCache(ctx, { sourceId: parsed.sourceId, text, target, source: forced });
   await interaction.editReply(
-    buildTranslationReply({ ...outcome, sourceId: parsed.sourceId, source: forced ?? AUTO_SOURCE, supported }),
+    buildTranslationReply({ ...outcome, sourceId: parsed.sourceId, source: forced ?? AUTO_SOURCE, supported, tr }),
   );
 }
 

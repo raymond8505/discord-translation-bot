@@ -4,6 +4,7 @@ import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { makeContext } from "./fixtures/context.fixture.js";
 import { MESSAGE_ID, SPANISH_TEXT, lastReplyDescription, lastReplyPayload } from "./fixtures/interaction.fixture.js";
 import { BOT_USER_ID, makeMentionMessage } from "./fixtures/message.fixture.js";
+import { frenchMessages } from "./fixtures/messages.fixture.js";
 import { handleMentionMessage } from "./mentions.js";
 
 describe("handleMentionMessage", () => {
@@ -78,6 +79,18 @@ describe("handleMentionMessage", () => {
     await handleMentionMessage(ctx, message);
 
     expect(lastReplyDescription(message)).toMatch(/Reply to the message/);
+  });
+
+  it("speaks the guild's preferred language and reads hints in it", async () => {
+    const ctx = makeContext();
+
+    const outsideReply = makeMentionMessage({ parent: null, preferredLocale: "fr" });
+    await handleMentionMessage(ctx, outsideReply);
+    expect(lastReplyDescription(outsideReply)).toBe(frenchMessages["mention.hint"]);
+
+    const hinted = makeMentionMessage({ content: `<@${BOT_USER_ID}> allemand`, preferredLocale: "fr" });
+    await handleMentionMessage(ctx, hinted);
+    expect(ctx.backend.translateCalls.map((c) => c.target)).toEqual(["de"]);
   });
 
   it("notices an unreadable or empty parent", async () => {

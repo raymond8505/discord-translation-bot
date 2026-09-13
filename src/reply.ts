@@ -10,6 +10,7 @@ import {
   buildSelectCustomId,
   type SelectRole,
 } from "./components/customId.js";
+import type { Translator } from "./i18n/index.js";
 import { labelFor, menuLanguages, type MenuLanguage } from "./locale.js";
 
 /** Discord limits: embed description length, options per select menu, rows per message (5). */
@@ -20,12 +21,6 @@ const MENUS_PER_ROLE = 2;
 /** Below this, LibreTranslate's guess is shown with a "not sure" note and how to force the source. */
 export const LOW_CONFIDENCE_PERCENT = 50;
 
-const UNCERTAIN_NOTE =
-  "Pick the source in the menus below or reply with `@Translation Bot <source>:<target>` " +
-  "(e.g. `fr:en`), or use `/translate` with its `source` option.";
-
-const AUTO_OPTION: MenuLanguage = { code: AUTO_VALUE, label: "Auto-detect" };
-
 export interface TranslationReplyInput {
   readonly sourceId: string;
   readonly target: string;
@@ -35,6 +30,8 @@ export interface TranslationReplyInput {
   readonly cached: boolean;
   readonly sameLanguage: boolean;
   readonly supported: ReadonlySet<string>;
+  /** Words the reply and names the languages for the reader. */
+  readonly tr: Translator;
 }
 
 export interface ReplyPayload {
@@ -45,50 +42,52 @@ export interface ReplyPayload {
 export function buildTranslationReply(
   input: TranslationReplyInput,
 ): ReplyPayload {
-  const { entry, target, source, cached, sameLanguage, sourceId, supported } =
+  const { entry, target, source, cached, sameLanguage, sourceId, supported, tr } =
     input;
 
   const confidence = entry.confidence;
   const uncertain =
     confidence !== undefined && confidence < LOW_CONFIDENCE_PERCENT;
+  const sourceLabel = labelFor(entry.source_lang, tr.language);
   const sourcePart =
     confidence === undefined
-      ? `source: ${labelFor(entry.source_lang)}`
-      : `detected: ${labelFor(entry.source_lang)} (${Math.round(confidence)}%)`;
+      ? tr.t("reply.source", { language: sourceLabel })
+      : `${tr.t("reply.detected", { language: sourceLabel })} (${Math.round(confidence)}%)`;
 
   const footer = [
     sourcePart,
     entry.backend,
-    cached ? "cached" : null,
-    sameLanguage ? "already in the target language" : null,
+    cached ? tr.t("reply.cached") : null,
+    sameLanguage ? tr.t("reply.sameLanguage") : null,
   ]
     .filter((part): part is string => part !== null)
     .join(" · ");
 
   const embed = new EmbedBuilder()
-    .setTitle(`Translation → ${labelFor(target)}`)
+    .setTitle(`${tr.t("reply.title")} → ${labelFor(target, tr.language)}`)
     .setDescription(truncate(entry.text, EMBED_DESCRIPTION_MAX))
     .setFooter({ text: footer });
   if (uncertain) {
     embed.addFields({
-      name: "Couldn't auto-detect source language",
-      value: UNCERTAIN_NOTE,
+      name: tr.t("reply.uncertain.name"),
+      value: tr.t("reply.uncertain.value"),
     });
   }
 
-  const languages = menuLanguages(supported);
+  const languages = menuLanguages(supported, tr.language);
   if (languages.length === 0) return { embeds: [embed], components: [] };
 
+  const autoOption: MenuLanguage = { code: AUTO_VALUE, label: tr.t("menu.auto") };
   const components = [
     // Source menus preselect what the backend detected (or what was forced);
     // "Auto-detect" leads so a user can hand control back after forcing.
     ...buildMenus({
       role: "source",
-      languages: [AUTO_OPTION, ...languages],
+      languages: [autoOption, ...languages],
       selected: entry.source_lang,
       other: target,
       sourceId,
-      placeholder: "Translate from…",
+      placeholder: `${tr.t("menu.from")}…`,
     }),
     ...buildMenus({
       role: "target",
@@ -96,7 +95,7 @@ export function buildTranslationReply(
       selected: target,
       other: source,
       sourceId,
-      placeholder: "Translate to…",
+      placeholder: `${tr.t("menu.to")}…`,
     }),
   ];
 
@@ -162,7 +161,8 @@ function buildMenus(
   return rows;
 }
 
-function truncate(text: string, max: number): string {
+/** Cuts `text` to `max` characters, ending in an ellipsis when it had to. */
+export function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1)}…`;
 }

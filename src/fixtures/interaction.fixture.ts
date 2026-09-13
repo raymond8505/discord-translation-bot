@@ -43,10 +43,12 @@ export function makeChatInputInteraction(
 
 export function makeAutocompleteInteraction(
   focused: string,
+  locale = "en-US",
 ): TranslateAutocompleteInteraction & ResponseLog {
   const calls: ResponseLog["calls"] = [];
   return {
     calls,
+    locale,
     options: { getFocused: () => focused },
     async respond(choices) {
       calls.push({ method: "respond", payload: choices });
@@ -86,6 +88,7 @@ export interface SelectOptions {
   channelMessage?: { content: string } | null;
   /** `channel: null` models an interaction with no channel to fetch from. */
   withoutChannel?: boolean;
+  locale?: string;
 }
 
 export function makeSelectInteraction(options: SelectOptions): LanguageSelectInteraction & ResponseLog {
@@ -93,6 +96,7 @@ export function makeSelectInteraction(options: SelectOptions): LanguageSelectInt
   const channelMessage = options.channelMessage;
   return {
     calls,
+    locale: options.locale ?? "en-US",
     customId: options.customId,
     values: options.value === undefined ? ["fr"] : [options.value],
     message: {

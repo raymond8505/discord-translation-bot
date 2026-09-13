@@ -8,6 +8,7 @@ import {
   makeAutocompleteInteraction,
   makeChatInputInteraction,
 } from "../fixtures/interaction.fixture.js";
+import { frenchMessages } from "../fixtures/messages.fixture.js";
 import { sourceIdForText } from "../sourceId.js";
 import { handleTranslate, handleTranslateAutocomplete, translateCommand } from "./translate.js";
 
@@ -91,6 +92,19 @@ describe("handleTranslate", () => {
     expect(lastReplyDescription(interaction)).toBe("Nothing to translate.");
     expect(ctx.backend.translateCalls).toHaveLength(0);
   });
+
+  it("speaks the user's Discord language and understands language names in it", async () => {
+    const ctx = makeContext();
+
+    const empty = makeChatInputInteraction({ text: " ", locale: "fr" });
+    await handleTranslate(ctx, empty);
+    expect(lastReplyDescription(empty)).toBe(frenchMessages["translate.nothing"]);
+
+    const named = makeChatInputInteraction({ text: "hola", target: "allemand", locale: "fr" });
+    await handleTranslate(ctx, named);
+    expect(ctx.backend.translateCalls.map((c) => c.target)).toEqual(["de"]);
+    expect(lastReplyPayload(named)?.embeds[0]?.toJSON().title).toBe(`${frenchMessages["reply.title"]} → Allemand`);
+  });
 });
 
 describe("handleTranslateAutocomplete", () => {
@@ -121,5 +135,15 @@ describe("handleTranslateAutocomplete", () => {
     const all = makeAutocompleteInteraction("");
     await handleTranslateAutocomplete(ctx, all);
     expect((all.calls[0]?.payload as unknown[]).length).toBeLessThanOrEqual(25);
+  });
+
+  it("offers names in the user's Discord language", async () => {
+    const ctx = makeContext();
+    await ctx.languages.get();
+
+    const interaction = makeAutocompleteInteraction("allem", "fr");
+    await handleTranslateAutocomplete(ctx, interaction);
+
+    expect(interaction.calls[0]?.payload).toEqual([{ name: "Allemand", value: "de" }]);
   });
 });

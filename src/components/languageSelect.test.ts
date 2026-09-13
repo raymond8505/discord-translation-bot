@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { sourceKey } from "../cache.js";
 import { makeContext } from "../fixtures/context.fixture.js";
 import { MESSAGE_ID, lastReplyDescription, lastReplyPayload, makeSelectInteraction } from "../fixtures/interaction.fixture.js";
+import { frenchMessages } from "../fixtures/messages.fixture.js";
 import { makeFakeRedis } from "../fixtures/redis.fixture.js";
 import { sourceIdForText } from "../sourceId.js";
 import { buildSelectCustomId, parseSelectCustomId } from "./customId.js";
@@ -96,6 +97,15 @@ describe("handleLanguageSelect", () => {
     expect(lastReplyDescription(noChannel)).toMatch(/no longer available/);
 
     expect(ctx.backend.translateCalls).toHaveLength(0);
+  });
+
+  it("words the expiry notice in the clicker's Discord language", async () => {
+    const ctx = makeContext();
+    const deleted = makeSelectInteraction({ customId: targetMenu, channelMessage: null, locale: "fr" });
+
+    await handleLanguageSelect(ctx, deleted);
+
+    expect(lastReplyDescription(deleted)).toBe(frenchMessages["select.expired"]);
   });
 
   it("falls back to a fetch when Redis itself fails", async () => {

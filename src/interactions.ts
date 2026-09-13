@@ -52,7 +52,7 @@ async function respondWithError(ctx: AppContext, interaction: Interaction, err: 
       return;
     }
     if (!interaction.isRepliable()) return;
-    const notice = buildNoticeReply(userMessageFor(err));
+    const notice = buildNoticeReply(userMessageFor(err, ctx.i18n.forLocale(interaction.locale)));
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply(notice);
     } else {

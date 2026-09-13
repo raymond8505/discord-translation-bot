@@ -37,10 +37,14 @@ LibreTranslate's `/languages` and `/translate` expose them as `pt-BR`, `zh-Hans`
 pattern accepts `xx`, `xxx`, and `xx-Xxxx` forms.
 
 - `resolveTarget(locale, supported)`: table → bare prefix → `en`.
-- `menuLanguages(supported)`: dedupes by backend code, sorted by label (≤ 50 for two menus).
-- `parseLanguageHint(text, supported)`: label / code / locale, tolerates "to|into|in" prefixes.
-- `parseLanguageSpec(text, supported)`: `source:target` with either side optional, or a bare target;
-  reports `unresolved` parts so callers can name what they didn't understand.
+- `menuLanguages(supported, uiLang)`: dedupes by backend code, named in `uiLang` and sorted by that
+  name (≤ 50 for two menus).
+- `labelFor(code, uiLang)`: the table label for `en`; otherwise ICU's `Intl.DisplayNames` on the
+  def's first code, capitalised. Never passes `auto` or a `t_…` id to ICU (it throws).
+- `parseLanguageHint(text, supported, uiLang)`: English or `uiLang` label / code / locale, tolerates
+  "to|into|in" prefixes.
+- `parseLanguageSpec(text, supported, uiLang)`: `source:target` with either side optional, or a bare
+  target; reports `unresolved` parts so callers can name what they didn't understand.
 - `SupportedLanguages` (`src/languages.ts`) memoizes only a successful fetch; a memo older than
   `LANGUAGES_REFRESH_MS` (5 min) is served but re-fetched in the background, so a changed
   `LT_LOAD_ONLY` shows up without a bot restart. `peek()` is the synchronous view for autocomplete.

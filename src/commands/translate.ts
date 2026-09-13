@@ -4,6 +4,7 @@ import {
   type ApplicationCommandOptionChoiceData,
 } from "discord.js";
 import type { AppContext } from "../context.js";
+import { staticI18n, type Translator } from "../i18n/index.js";
 import { menuLanguages, parseLanguageHint, parseLanguageSpec, resolveTarget } from "../locale.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForText } from "../sourceId.js";
@@ -15,26 +16,29 @@ const TARGET_OPTION = "target";
 const SOURCE_OPTION = "source";
 const AUTOCOMPLETE_MAX = 25;
 
+/** Command metadata is plain text on Discord's side, so the colon form is passed in rather than code-spanned. */
+const TARGET_DESCRIPTION_PARAMS = { form: "source:target", example: "fr:en" };
+
 export const translateCommand = new SlashCommandBuilder()
   .setName(TRANSLATE_COMMAND_NAME)
-  .setDescription("Translate some text (reply visible only to you)")
+  .setDescription(staticI18n.message("en", "cmd.translate.description"))
   .addStringOption((option) =>
     option
       .setName(TEXT_OPTION)
-      .setDescription("Text to translate")
+      .setDescription(staticI18n.message("en", "cmd.translate.text"))
       .setRequired(true)
       .setMaxLength(MAX_INPUT_CHARS),
   )
   .addStringOption((option) =>
     option
       .setName(TARGET_OPTION)
-      .setDescription("Target language (defaults to your Discord language); also accepts source:target, e.g. fr:en")
+      .setDescription(staticI18n.message("en", "cmd.translate.target", TARGET_DESCRIPTION_PARAMS))
       .setAutocomplete(true),
   )
   .addStringOption((option) =>
     option
       .setName(SOURCE_OPTION)
-      .setDescription("Source language, when auto-detection gets it wrong")
+      .setDescription(staticI18n.message("en", "cmd.translate.source"))
       .setAutocomplete(true),
   );
 
@@ -48,34 +52,35 @@ export interface TranslateInteraction {
   editReply(payload: ReplyPayload): Promise<unknown>;
 }
 
-function unknownLanguage(name: string): ReplyPayload {
-  return buildNoticeReply(`I don't know a language called "${name}".`);
+function unknownLanguage(tr: Translator, name: string): ReplyPayload {
+  return buildNoticeReply(tr.t("translate.unknownLanguage", { name }));
 }
 
 export async function handleTranslate(ctx: AppContext, interaction: TranslateInteraction): Promise<void> {
   // Discord gives us 3 seconds to acknowledge; the backend can take longer.
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const tr = ctx.i18n.forLocale(interaction.locale);
 
   const text = (interaction.options.getString(TEXT_OPTION, true) ?? "").trim();
   if (!text) {
-    await interaction.editReply(buildNoticeReply("Nothing to translate."));
+    await interaction.editReply(buildNoticeReply(tr.t("translate.nothing")));
     return;
   }
 
   const supported = await ctx.languages.get();
 
-  const spec = parseLanguageSpec(interaction.options.getString(TARGET_OPTION) ?? "", supported);
+  const spec = parseLanguageSpec(interaction.options.getString(TARGET_OPTION) ?? "", supported, tr.language);
   if (spec.unresolved.length > 0) {
-    await interaction.editReply(unknownLanguage(spec.unresolved[0] ?? ""));
+    await interaction.editReply(unknownLanguage(tr, spec.unresolved[0] ?? ""));
     return;
   }
 
   let source = spec.source;
   const sourceRaw = interaction.options.getString(SOURCE_OPTION);
   if (sourceRaw) {
-    source = parseLanguageHint(sourceRaw, supported);
+    source = parseLanguageHint(sourceRaw, supported, tr.language);
     if (!source) {
-      await interaction.editReply(unknownLanguage(sourceRaw));
+      await interaction.editReply(unknownLanguage(tr, sourceRaw));
       return;
     }
   }
@@ -84,11 +89,12 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
   const sourceId = sourceIdForText(text);
   const outcome = await translateWithCache(ctx, { sourceId, text, target, source: source ?? undefined });
   await interaction.editReply(
-    buildTranslationReply({ ...outcome, sourceId, source: source ?? AUTO_SOURCE, supported }),
+    buildTranslationReply({ ...outcome, sourceId, source: source ?? AUTO_SOURCE, supported, tr }),
   );
 }
 
 export interface TranslateAutocompleteInteraction {
+  readonly locale: string;
   readonly options: { getFocused(): string };
   respond(choices: readonly ApplicationCommandOptionChoiceData[]): Promise<unknown>;
 }
@@ -103,8 +109,9 @@ export async function handleTranslateAutocomplete(
     await interaction.respond([]);
     return;
   }
+  const uiLang = ctx.i18n.forLocale(interaction.locale).language;
   const query = interaction.options.getFocused().trim().toLowerCase();
-  const choices = menuLanguages(supported)
+  const choices = menuLanguages(supported, uiLang)
     .filter((lang) => !query || lang.label.toLowerCase().includes(query) || lang.code.startsWith(query))
     .slice(0, AUTOCOMPLETE_MAX)
     .map((lang) => ({ name: lang.label, value: lang.code }));

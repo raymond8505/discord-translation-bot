@@ -58,6 +58,33 @@ function firstSupported(def: LanguageDef, supported: ReadonlySet<string>): strin
   return def.codes.find((code) => supported.has(code));
 }
 
+const displayNames = new Map<string, Intl.DisplayNames>();
+
+/**
+ * The language's name in `uiLang`, from ICU. English keeps the table label
+ * (ICU says "Norwegian Bokmål" where the menu wants "Norwegian"). Only the
+ * def's first code is passed to ICU: it is always a valid BCP-47 tag, whereas
+ * `of("zt")` returns nothing and `of("auto")` throws.
+ */
+function displayLabel(def: LanguageDef, uiLang: string): string {
+  if (uiLang === "en") return def.label;
+  try {
+    let names = displayNames.get(uiLang);
+    if (!names) {
+      names = new Intl.DisplayNames([uiLang], { type: "language", fallback: "none", languageDisplay: "standard" });
+      displayNames.set(uiLang, names);
+    }
+    const name = names.of(def.codes[0] ?? "");
+    if (!name) return def.label;
+    // ICU gives "français"; a menu option and its A–Z placeholder want "Français".
+    return name.charAt(0).toLocaleUpperCase(uiLang) + name.slice(1);
+  } catch {
+    return def.label;
+  }
+}
+
+const PARENTHETICAL = /\s*[(（].*[)）]$/;
+
 function defForLocale(locale: string): LanguageDef | undefined {
   const wanted = locale.toLowerCase();
   return LANGUAGES.find((def) => def.locales.some((l) => l.toLowerCase() === wanted));
@@ -82,22 +109,24 @@ export function resolveTarget(locale: string, supported: ReadonlySet<string>): s
 /**
  * Languages to offer in the re-translate menu: every table entry the backend
  * can serve, one entry per backend code (a fallback that collapses onto an
- * already-listed code is dropped), sorted by label.
+ * already-listed code is dropped), named in `uiLang` and sorted by that name.
  */
-export function menuLanguages(supported: ReadonlySet<string>): MenuLanguage[] {
+export function menuLanguages(supported: ReadonlySet<string>, uiLang = "en"): MenuLanguage[] {
   const seen = new Set<string>();
   const out: MenuLanguage[] = [];
   for (const def of LANGUAGES) {
     const code = firstSupported(def, supported);
     if (!code || seen.has(code)) continue;
     seen.add(code);
-    out.push({ code, label: def.label });
+    out.push({ code, label: displayLabel(def, uiLang) });
   }
-  return out.sort((a, b) => a.label.localeCompare(b.label, "en"));
+  return out.sort((a, b) => a.label.localeCompare(b.label, uiLang));
 }
 
-export function labelFor(code: string): string {
-  return LANGUAGES.find((def) => def.codes.includes(code))?.label ?? code;
+/** The language's name in `uiLang`, or the code itself when the table doesn't know it. */
+export function labelFor(code: string, uiLang = "en"): string {
+  const def = LANGUAGES.find((candidate) => candidate.codes.includes(code));
+  return def ? displayLabel(def, uiLang) : code;
 }
 
 const HINT_PREFIXES = ["to", "into", "in"];
@@ -105,10 +134,11 @@ const HINT_PREFIXES = ["to", "into", "in"];
 /**
  * Reads a target language out of free text such as "to French", "fr", or
  * "zh-TW". Returns the backend code, or null when nothing in the text names a
- * language the backend supports. Labels match with or without their
- * parenthetical, so "chinese" resolves to the first Chinese entry.
+ * language the backend supports. Labels match in English and in `uiLang`,
+ * with or without their parenthetical, so "chinese" (or "chinois") resolves
+ * to the first Chinese entry.
  */
-export function parseLanguageHint(text: string, supported: ReadonlySet<string>): string | null {
+export function parseLanguageHint(text: string, supported: ReadonlySet<string>, uiLang = "en"): string | null {
   let phrase = text.trim().toLowerCase().replace(/\s+/g, " ");
   if (!phrase) return null;
   for (const prefix of HINT_PREFIXES) {
@@ -118,12 +148,15 @@ export function parseLanguageHint(text: string, supported: ReadonlySet<string>):
     }
   }
 
+  const localized = (def: LanguageDef): string => displayLabel(def, uiLang).toLowerCase();
   const matchers: Array<(def: LanguageDef) => boolean> = [
-    (def) => def.label.toLowerCase() === phrase,
+    (def) => def.label.toLowerCase() === phrase || localized(def) === phrase,
     (def) =>
       def.codes.some((c) => c.toLowerCase() === phrase) ||
       def.locales.some((l) => l.toLowerCase() === phrase),
-    (def) => def.label.toLowerCase().replace(/\s*\(.*\)$/, "") === phrase,
+    (def) =>
+      def.label.toLowerCase().replace(PARENTHETICAL, "") === phrase ||
+      localized(def).replace(PARENTHETICAL, "") === phrase,
   ];
   for (const matches of matchers) {
     const def = LANGUAGES.find(matches);
@@ -150,20 +183,20 @@ const EMPTY_SPEC: LanguageSpec = { source: null, target: null, unresolved: [] };
  * (`fr:` forces the source, `:en` picks the target) and text without a colon
  * is a bare target hint. Each side accepts whatever `parseLanguageHint` does.
  */
-export function parseLanguageSpec(text: string, supported: ReadonlySet<string>): LanguageSpec {
+export function parseLanguageSpec(text: string, supported: ReadonlySet<string>, uiLang = "en"): LanguageSpec {
   const phrase = text.trim();
   if (!phrase) return EMPTY_SPEC;
 
   const colon = phrase.indexOf(":");
   if (colon === -1) {
-    const target = parseLanguageHint(phrase, supported);
+    const target = parseLanguageHint(phrase, supported, uiLang);
     return { source: null, target, unresolved: target ? [] : [phrase] };
   }
 
   const left = phrase.slice(0, colon).trim();
   const right = phrase.slice(colon + 1).trim();
-  const source = left ? parseLanguageHint(left, supported) : null;
-  const target = right ? parseLanguageHint(right, supported) : null;
+  const source = left ? parseLanguageHint(left, supported, uiLang) : null;
+  const target = right ? parseLanguageHint(right, supported, uiLang) : null;
   const unresolved = [left && !source ? left : null, right && !target ? right : null].filter(
     (part): part is string => part !== null,
   );

@@ -11,6 +11,7 @@ import {
   makeSelectInteraction,
   type ResponseLog,
 } from "./fixtures/interaction.fixture.js";
+import { frenchMessages } from "./fixtures/messages.fixture.js";
 import { createInteractionHandler } from "./interactions.js";
 import type { ReplyPayload } from "./reply.js";
 
@@ -114,6 +115,18 @@ describe("createInteractionHandler", () => {
       flags: MessageFlags.Ephemeral,
     });
     expect(ctx.log.entries.some((e) => e.level === "error")).toBe(true);
+  });
+
+  it("words the error notice in the user's Discord language", async () => {
+    const ctx = makeContext();
+    const chat = makeChatInputInteraction({ locale: "fr" });
+    chat.deferReply = async () => {
+      throw new TypeError("gateway hiccup");
+    };
+
+    await createInteractionHandler(ctx)(asInteraction("chat", chat, { commandName: "translate" }));
+
+    expect(lastNotice(chat)?.text).toBe(frenchMessages["error.generic"]);
   });
 
   it("never throws even when the error notice itself cannot be delivered", async () => {
