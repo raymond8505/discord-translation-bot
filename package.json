@@ -1,7 +1,14 @@
 {
   "name": "discord-translation-bot",
   "version": "0.1.0",
+  "description": "Self-hosted, on-demand Discord translation via LibreTranslate, cached in Redis.",
   "private": true,
+  "license": "LicenseRef-PolyForm-Noncommercial-1.0.0",
+  "author": "Raymond Selzer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raymond8505/discord-translation-bot.git"
+  },
   "type": "module",
   "engines": {
     "node": "24.16.0"

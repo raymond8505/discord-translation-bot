@@ -348,3 +348,22 @@ it in `.env` locally, or edit the literal in the `.env` heredoc of
   already on the message (only the first posts), the emoji is a custom one
   rather than a country flag, or the message is one of the bot's own. Flag
   reactions need no portal change: the reactions intent is not privileged.
+
+## Licence
+
+[PolyForm Noncommercial 1.0.0](LICENSE) — **free for any noncommercial purpose**.
+
+Run it on your own Discord server, fork it, change it, share your changes: all free, so
+long as no commercial purpose is anticipated. The licence spells out personal use — hobby
+projects, private entertainment, study, experiment — and extends the same terms to
+charities, schools, public research and government bodies.
+
+Using it commercially — bundling it into a paid product, running it as a service you
+charge for, or operating it for a for-profit company's own business — needs a separate
+licence. Open an issue or email <raymond@raymondselzer.net> and ask; the answer is not
+automatically no.
+
+This is *source-available*, not OSI open source: an OSI-approved licence may not restrict
+commercial use, and this one deliberately does.
+
+Security problems go to [SECURITY.md](SECURITY.md), not the public issue tracker.
