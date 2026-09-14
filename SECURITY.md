@@ -46,5 +46,5 @@ Out of scope:
 ## Notes for self-hosters
 
 Running your own instance makes you the operator, and a few defaults are worth knowing
-about. The **Security** section of the [README](README.md) covers what the bot stores,
-for how long, and which privileged Discord intent it needs and why.
+about. The **[Security section of the README](README.md#security)** covers what the bot
+stores, for how long, and which privileged Discord intent it needs and why.

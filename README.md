@@ -105,8 +105,11 @@ Compose shortcuts (all in `package.json`):
 
 Other loops:
 
-- `yarn test`, `yarn typecheck`, `yarn lint` — the pre-commit hook runs
-  typecheck + lint-staged, the pre-push hook runs the tests.
+- `yarn test`, `yarn typecheck`, `yarn lint` — the pre-commit hook runs the
+  staged-secret check, typecheck and lint-staged; the pre-push hook runs the
+  tests. The secret check refuses a staged `.env` outright, and scans the
+  staged diff with `gitleaks` when gitleaks or Docker is available (it says so
+  and continues when neither is, since CI scans on every push regardless).
 - `yarn dev` runs the bot on the host with `tsx watch`; it needs reachable
   `REDIS_URL` / `LT_URL`, which the compose stack deliberately does not
   expose, so the container loop above is the supported path.
@@ -115,21 +118,23 @@ Other loops:
 
 `.github/workflows/deploy.yml` runs on every PR and push to `main`:
 
-1. **test** — `yarn typecheck`, `yarn lint`, `yarn test:run`
-2. **build** — `scripts/validate-deploy-env.sh`, `docker build .`,
+1. **secrets** — `gitleaks` over the full history (see [Security](#security))
+2. **test** — `yarn typecheck`, `yarn lint`, `yarn test:run`
+3. **build** — `scripts/validate-deploy-env.sh`, `docker build .`,
    `docker compose config`
-3. **deploy** (push to `main` only) — ssh to the VPS, clone or
+4. **deploy** (push to `main` only) — ssh to the VPS, clone or
    `git reset --hard origin/main` at `VPS_DEPLOY_PATH`, write `.env` from
    secrets, `docker compose up -d --build --remove-orphans`, wait for the
    bot container to report **healthy**, `docker image prune -f`.
 
 ### Repository secrets
 
-The `deploy` job needs all eight before it can run. Set them at **Settings →
-Secrets and variables → Actions → New repository secret**; the names must
-match exactly. The `test` and `build` jobs need none of them, so a run that
-goes green twice and then fails on "Deploy to VPS" is the signature of a
-secret that is missing or wrong.
+The `deploy` job needs all eight required ones before it can run. Set them at
+**Settings → Secrets and variables → Actions → New repository secret**; the
+names must match exactly. The `secrets`, `test` and `build` jobs need none of
+them, so a run that goes green three times and then fails on "Deploy to VPS" is
+the signature of a secret that is missing or wrong — the deploy asserts each one
+and names the missing variable rather than writing a blank into `.env`.
 
 | Secret | Value |
 | --- | --- |
@@ -141,6 +146,7 @@ secret that is missing or wrong.
 | `VPS_DEPLOY_PATH` | Absolute path to check the repo out at, e.g. `/opt/discord-translation-bot`. Created on first deploy; `.env` and the Docker volumes live there, so never delete it. |
 | `VPS_SSH_KEY` | **Private** half of a key the Action uses to log into the VPS (below). |
 | `GH_DEPLOY_KEY` | **Private** half of a key the VPS uses to clone this repo (below). |
+| `REDIS_PASSWORD` | **Optional.** Unset leaves Redis unauthenticated on its own compose network. Set any long random string if the VPS runs other containers — see [Security](#security). |
 
 Both key secrets hold a whole private key file. `-N ""` generates them without a
 passphrase, which is required — the Action cannot type one.
@@ -327,6 +333,60 @@ files: they come from Node's ICU data in the reader's language.
 `CACHE_TTL_SECONDS` (default `2592000`, 30 days) applies to new writes. Set
 it in `.env` locally, or edit the literal in the `.env` heredoc of
 `deploy.yml` for production. It is validated as a positive integer at boot.
+
+## Security
+
+Running your own instance makes you the operator of a bot that reads message
+content and stores it. What that involves, and the knobs that matter:
+
+**It needs the Message Content privileged intent.** Translating a message means
+reading it, so there is no version of this bot that does not. Discord gates the
+intent in the developer portal, and the bot also requests `Guilds`,
+`GuildMessages` and `GuildMessageReactions` — nothing else. Commands are
+registered to the single `GUILD_ID`, not globally, so a leaked invite link
+cannot put the bot to work in a server you did not choose.
+
+**It stores message text in Redis for 30 days.** Both the translation and the
+original text are cached (`tr:…` and `src:…`) for `CACHE_TTL_SECONDS`, so the
+re-translate menus work without re-fetching. That is a data-retention decision,
+and it is yours: lower it, and tell your members if that matters to them.
+Editing or deleting a message invalidates its entries.
+
+**Redis and LibreTranslate are unauthenticated by default, and publish no
+ports.** They are reachable only on the compose network, which is enough when
+the host runs nothing else. If it does, set `REDIS_PASSWORD` — otherwise any
+other container on that network can read every cached message. Never add a
+`ports:` entry to either service to "check something"; use `docker compose exec`.
+
+**Translation is local.** LibreTranslate runs in your own container with Argos
+models. No message text leaves your machine, and there is no third-party
+translation API and no key to leak. Swapping the backend is what changes that.
+
+**Rate limits are on by default.** `RATE_LIMIT_USER_PER_MIN` (20) and
+`RATE_LIMIT_GUILD_PER_HOUR` (2000) cap what one person, and one server, can ask
+of your hardware. They are budgets rather than a delay between requests, so a
+fast-moving conversation is unaffected. Raise them if you have the capacity;
+removing them entirely means one member can saturate the box. Over the limit,
+slash commands answer privately and the public triggers (`@mention`, flag
+reaction) simply stay quiet.
+
+**Anyone in the channel can use the public replies.** A flag reaction or an
+`@mention` posts publicly, and the language menus on that post are clickable by
+anyone who can see it — by design, since the reply is public anyway. Each click
+answers only the person who clicked, and counts against *their* budget.
+
+**The containers are confined.** All three drop every Linux capability, set
+`no-new-privileges`, and carry memory and pid limits; the bot additionally runs
+on a read-only root filesystem as a non-root user. Redis is capped below its
+memory limit so a full cache evicts rather than being OOM-killed.
+
+**Secrets never enter the image or the repo.** They reach the container through
+`.env` only, which is in both `.gitignore` and `.dockerignore`; the deploy
+writes it under `umask 077`. `gitleaks` scans the full history on every push and
+a pre-commit hook refuses a staged `.env`. If you fork this, the CI workflow
+expects its own secrets — see [Repository secrets](#repository-secrets).
+
+Found a problem? [SECURITY.md](SECURITY.md) — please not the public tracker.
 
 ## Troubleshooting
 
