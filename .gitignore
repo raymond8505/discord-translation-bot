@@ -17,3 +17,6 @@
 .claude/settings.local.json
 .claude/settings.json
 .claude/scratch/*
+
+# machine-local code index (SQLite), rebuilt with `codegraph init .`
+.codegraph/
