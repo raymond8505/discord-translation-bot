@@ -1,0 +1,29 @@
+# Secret scanning config. `gitleaks detect` runs over the full history in CI and
+# from the pre-commit hook over staged changes.
+#
+# Every entry below is a false positive that has been read and understood. Add
+# to this file only after confirming the match is not a secret — never to make a
+# failing scan quiet. A real leak is fixed by rotating the credential, not by
+# allowlisting it.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """
+README's deploy section documents generating the two SSH keys, and quotes the
+PEM header so the reader knows which lines to copy. It is the literal string
+"-----BEGIN OPENSSH PRIVATE KEY-----" in prose, never key material.
+"""
+paths = ['''^README\.md$''']
+regexes = ['''-----BEGIN OPENSSH PRIVATE KEY-----''']
+
+[[allowlists]]
+description = """
+Test fixtures. Discord ids are 17-20 digit snowflakes, so any placeholder of the
+right shape trips the client-id rule; these are the deliberately fake
+123456789012345678 / 876543210987654321 sort. The whole directory is excluded
+from the built image by tsconfig.build.json and never holds real configuration —
+the one place real values live is .env, which is gitignored and unscanned.
+"""
+paths = ['''^src/fixtures/.*\.fixture\.ts$''']

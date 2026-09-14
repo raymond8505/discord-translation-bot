@@ -1,2 +1,3 @@
+sh scripts/check-staged-secrets.sh
 yarn typecheck
 npx lint-staged
