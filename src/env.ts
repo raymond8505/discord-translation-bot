@@ -20,6 +20,15 @@ export const envSchema = z.object({
   LT_URL: z.url({ protocol: /^https?$/ }),
   BACKEND: z.enum(["libretranslate", "ollama"]).default("libretranslate"),
   CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(2_592_000),
+  /**
+   * Per-user budget, not a cooldown between requests: a fast-moving thread has
+   * one person translating several messages in a row, and a fixed delay would
+   * punish exactly the case the bot exists for. Twenty a minute is far above
+   * that and far below what abuse looks like.
+   */
+  RATE_LIMIT_USER_PER_MIN: z.coerce.number().int().positive().default(20),
+  /** Ceiling on what the whole guild can cost the backend in an hour. */
+  RATE_LIMIT_GUILD_PER_HOUR: z.coerce.number().int().positive().default(2_000),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -42,6 +51,8 @@ export function runtimeEnv(): EnvSource {
     LT_URL: process.env.LT_URL,
     BACKEND: process.env.BACKEND,
     CACHE_TTL_SECONDS: process.env.CACHE_TTL_SECONDS,
+    RATE_LIMIT_USER_PER_MIN: process.env.RATE_LIMIT_USER_PER_MIN,
+    RATE_LIMIT_GUILD_PER_HOUR: process.env.RATE_LIMIT_GUILD_PER_HOUR,
   };
   return blankToUndefined(raw);
 }

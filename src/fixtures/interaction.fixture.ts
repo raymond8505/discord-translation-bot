@@ -12,12 +12,18 @@ export interface ResponseLog {
 
 export const MESSAGE_ID = "123456789012345678";
 export const SPANISH_TEXT = "¿Hola, cómo estás?";
+/** The actor behind every interaction fixture, for rate-limit assertions. */
+export const USER_ID = "222222222222222222";
+export const GUILD_ID = "876543210987654321";
 
 export interface ChatInputOptions {
   text?: string;
   target?: string | null;
   source?: string | null;
   locale?: string;
+  userId?: string;
+  /** `null` models a DM, where there is no guild budget to spend. */
+  guildId?: string | null;
 }
 
 export function makeChatInputInteraction(
@@ -32,6 +38,8 @@ export function makeChatInputInteraction(
   return {
     calls,
     locale: options.locale ?? "en-US",
+    user: { id: options.userId ?? USER_ID },
+    guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     options: { getString: (name) => values[name] ?? null },
     async deferReply(payload) {
       calls.push({ method: "deferReply", payload });
@@ -75,6 +83,8 @@ export interface MessageContextOptions {
   id?: string;
   content?: string;
   locale?: string;
+  userId?: string;
+  guildId?: string | null;
 }
 
 export function makeMessageContextInteraction(
@@ -84,6 +94,8 @@ export function makeMessageContextInteraction(
   return {
     calls,
     locale: options.locale ?? "fr",
+    user: { id: options.userId ?? USER_ID },
+    guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     targetMessage: { id: options.id ?? MESSAGE_ID, content: options.content ?? SPANISH_TEXT },
     async deferReply(payload) {
       calls.push({ method: "deferReply", payload });
@@ -104,6 +116,8 @@ export interface SelectOptions {
   /** `channel: null` models an interaction with no channel to fetch from. */
   withoutChannel?: boolean;
   locale?: string;
+  userId?: string;
+  guildId?: string | null;
 }
 
 export function makeSelectInteraction(options: SelectOptions): LanguageSelectInteraction & ResponseLog {
@@ -112,6 +126,8 @@ export function makeSelectInteraction(options: SelectOptions): LanguageSelectInt
   return {
     calls,
     locale: options.locale ?? "en-US",
+    user: { id: options.userId ?? USER_ID },
+    guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     customId: options.customId,
     values: options.value === undefined ? ["fr"] : [options.value],
     message: {

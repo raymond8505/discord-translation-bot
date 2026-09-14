@@ -4,6 +4,8 @@
   "error.unavailable": "De geconfigureerde vertaalbackend is niet beschikbaar.",
   "error.invalidResponse": "De vertaaldienst gaf iets terug wat ik niet kon lezen.",
   "error.generic": "Er ging iets mis tijdens het vertalen. Probeer het nog eens.",
+  "error.rateLimited.user": "U heeft in korte tijd veel vertalingen gevraagd. Probeer het opnieuw in {seconds} seconden.",
+  "error.rateLimited.guild": "Deze server heeft zijn vertalingen voor dit uur opgebruikt. Probeer het later nog eens.",
   "translate.nothing": "Niets te vertalen.",
   "translate.unknownLanguage": "Ik ken geen taal genaamd \"{name}\".",
   "translate.noText": "Dat bericht heeft geen tekst om te vertalen.",

@@ -32,6 +32,42 @@ Add a new command by exporting its builder from `src/commands/`, appending it to
   `src/translate.ts`.
 - **Every string goes through `ctx.i18n.forLocale(interaction.locale)`** (guild locale on the mention
   trigger); language names and hint parsing take `tr.language`. See [i18n.md](i18n.md).
+- **Every trigger that can reach the backend checks `ctx.rateLimiter` first** — see below.
+
+## Rate limiting
+
+`src/rateLimit.ts` counts every request against a per-user-per-minute and a per-guild-per-hour
+budget (`RATE_LIMIT_USER_PER_MIN`, `RATE_LIMIT_GUILD_PER_HOUR`), as fixed-window `INCR`+`EXPIRE`
+keys `rl:u:<userId>:<window>` and `rl:g:<guildId>:<window>`. Budgets, not a cooldown between
+requests: the bot exists for fast-moving threads where one person translates several messages in a
+row, and a fixed delay would punish exactly that. Cache hits count too — a request costs a Discord
+API call whether or not it reaches the backend.
+
+Five surfaces check it: `/translate`, the context menu, the mention trigger, the flag reaction, and
+**the select menus** — a menu pick re-translates, and menus on a public reply are clickable by
+anyone in the channel, which makes them the cheapest surface to hammer.
+
+**Where the check goes, and what a refusal looks like, differ by surface:**
+
+- *Interactions* (`/translate`, context menu, select) check **after the defer** so the 3 s
+  acknowledgement still lands, and **before `ctx.languages.get()`**, which is itself a backend call
+  on a cold start. A refusal is an ephemeral `buildNoticeReply` via `rateLimitMessageFor()`.
+- *The public triggers* (mention, flag reaction) are **silent** when over budget — logged, never
+  answered. A public "slow down" for every refused request doubles the flood it is meant to stop.
+  The flag trigger checks before its partial fetches, which a partial message's `guildId` allows.
+
+Two properties are load-bearing and have tests:
+
+- **It fails open.** A Redis outage must cost backend calls, never the bot's ability to answer;
+  failing closed would turn a cache outage into a total outage and hand anyone who can disrupt
+  Redis a way to silence the bot.
+- **It has its own 1 s deadline** (`CHECK_TIMEOUT_MS`). node-redis queues commands against a dead
+  server and rejects only on its own 5 s default — measured by killing Redis under a connected
+  client — which would add five seconds to every request during an outage, to reach a decision that
+  is already going to be "allow".
+
+A refused request does **not** spend the guild budget: the guild counter is only reached once the
+user is inside their own, so one spammer cannot burn everyone else's hour while being refused anyway.
 
 ## Mention trigger
 

@@ -12,6 +12,7 @@ import { createSupportedLanguages } from "./languages.js";
 import { log } from "./log.js";
 import { handleMentionMessage } from "./mentions.js";
 import { handleFlagReaction } from "./reactions.js";
+import { createRateLimiter } from "./rateLimit.js";
 import { registerCommands } from "./registerCommands.js";
 
 const SHUTDOWN_GRACE_MS = 5_000;
@@ -33,6 +34,10 @@ async function main(): Promise<void> {
     backend,
     cache: createCache(redis, env.CACHE_TTL_SECONDS),
     languages: createSupportedLanguages(backend),
+    rateLimiter: createRateLimiter(redis, {
+      userPerMinute: env.RATE_LIMIT_USER_PER_MIN,
+      guildPerHour: env.RATE_LIMIT_GUILD_PER_HOUR,
+    }),
     i18n: createI18n(),
     log,
   };

@@ -10,8 +10,9 @@ import { AUTO_SOURCE, translateWithCache } from "./translate.js";
 /** The slice of `Message` the mention trigger touches. */
 export interface MentionMessage {
   readonly content: string;
-  readonly author: { readonly bot: boolean };
+  readonly author: { readonly bot: boolean; readonly id: string };
   readonly client: { readonly user: { readonly id: string } | null };
+  readonly guildId: string | null;
   readonly guild: { readonly preferredLocale: string } | null;
   readonly reference: { readonly messageId: string | undefined } | null;
   readonly mentions: { has(userId: string, options?: MessageMentionsHasOptions): boolean };
@@ -42,6 +43,16 @@ export async function handleMentionMessage(ctx: AppContext, message: MentionMess
   if (message.author.bot) return;
   const bot = message.client.user;
   if (!bot || !message.mentions.has(bot.id, MENTION_OPTIONS)) return;
+
+  // Over-limit is silent here, not a notice. This trigger's replies are public,
+  // so answering every refused request would turn one person's spam into two
+  // messages instead of none — the notice becomes the flood it is meant to stop.
+  // The budget is far above conversational use, so silence only ever meets abuse.
+  const limit = await ctx.rateLimiter.check({ userId: message.author.id, guildId: message.guildId });
+  if (!limit.allowed) {
+    ctx.log.warn(`mention trigger: rate limited (${limit.scope ?? "unknown"} budget); ignoring`);
+    return;
+  }
 
   const tr = ctx.i18n.forLocale(message.guild?.preferredLocale ?? "");
   try {

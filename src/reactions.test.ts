@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BackendError } from "./backends/index.js";
 import { makeFakeBackend } from "./fixtures/backend.fixture.js";
-import { makeContext } from "./fixtures/context.fixture.js";
+import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
 import { lastReplyDescription, lastReplyPayload, MESSAGE_ID, SPANISH_TEXT } from "./fixtures/interaction.fixture.js";
 import { BOT_USER_ID } from "./fixtures/message.fixture.js";
 import { frenchMessages } from "./fixtures/messages.fixture.js";
@@ -140,5 +140,18 @@ describe("handleFlagReaction", () => {
     expect(lastReplyDescription(reaction)).toMatch(/still starting up/);
     expect(ctx.log.entries.map((entry) => entry.level)).toContain("warn");
     expect(ctx.log.entries.some((entry) => entry.level === "error")).toBe(false);
+  });
+
+  it("stays silent when rate limited, before fetching anything", async () => {
+    const ctx = makeContext({ rateLimiter: alwaysLimited() });
+    const reaction = makeFlagReaction({ partial: true, messagePartial: true });
+
+    await handleFlagReaction(ctx, reaction, makeReactingUser());
+
+    // Refused early enough that neither partial is fetched: a partial message
+    // already carries the guildId the decision needs.
+    expect(reaction.fetchCalls).toEqual([]);
+    expect(reaction.message.calls).toEqual([]);
+    expect(ctx.backend.translateCalls).toEqual([]);
   });
 });

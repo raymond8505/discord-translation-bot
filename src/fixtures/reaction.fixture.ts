@@ -1,6 +1,6 @@
 import type { FlagReaction, ReactedMessage, ReactingUser, ReactionSummary } from "../reactions.js";
 import type { ReplyPayload } from "../reply.js";
-import { MESSAGE_ID, SPANISH_TEXT, type ResponseLog } from "./interaction.fixture.js";
+import { GUILD_ID, MESSAGE_ID, SPANISH_TEXT, USER_ID, type ResponseLog } from "./interaction.fixture.js";
 import { BOT_USER_ID } from "./message.fixture.js";
 
 /**
@@ -53,6 +53,8 @@ export interface FlagReactionOptions {
   authorId?: string;
   /** `client.user` is null before the gateway is ready. */
   clientReady?: boolean;
+  /** `null` models a DM, where there is no guild budget to spend. */
+  guildId?: string | null;
 }
 
 export interface FakeReactedMessage extends ReactedMessage, ResponseLog {}
@@ -82,6 +84,7 @@ export function makeFlagReaction(options: FlagReactionOptions = {}): FakeFlagRea
     content: options.content ?? SPANISH_TEXT,
     author: { id: options.authorId ?? AUTHOR_ID },
     client: { user: options.clientReady === false ? null : { id: BOT_USER_ID } },
+    guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     guild: { preferredLocale: options.preferredLocale ?? "en-US" },
     reactions: { cache },
     async fetch() {
@@ -110,6 +113,6 @@ export function makeFlagReaction(options: FlagReactionOptions = {}): FakeFlagRea
   return reaction;
 }
 
-export function makeReactingUser(isBot = false): ReactingUser {
-  return { bot: isBot };
+export function makeReactingUser(isBot = false, id: string = USER_ID): ReactingUser {
+  return { bot: isBot, id };
 }

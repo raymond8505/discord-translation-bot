@@ -1,7 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { sourceKey, translationKey } from "../cache.js";
-import { makeContext } from "../fixtures/context.fixture.js";
+import { alwaysLimited, makeContext } from "../fixtures/context.fixture.js";
 import {
   MESSAGE_ID,
   SPANISH_TEXT,
@@ -55,5 +55,15 @@ describe("handleTranslateMessage", () => {
     await handleTranslateMessage(ctx, interaction);
 
     expect(lastReplyDescription(interaction)).toBe(frenchMessages["translate.noText"]);
+  });
+
+  it("refuses with an ephemeral notice when rate limited", async () => {
+    const ctx = makeContext({ rateLimiter: alwaysLimited("user", 17) });
+    const interaction = makeMessageContextInteraction();
+
+    await handleTranslateMessage(ctx, interaction);
+
+    expect(lastReplyDescription(interaction)).toContain("17");
+    expect(ctx.backend.translateCalls).toEqual([]);
   });
 });

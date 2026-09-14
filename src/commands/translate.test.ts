@@ -1,7 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { translationKey } from "../cache.js";
-import { makeContext } from "../fixtures/context.fixture.js";
+import { alwaysLimited, makeContext } from "../fixtures/context.fixture.js";
 import {
   lastReplyDescription,
   lastReplyPayload,
@@ -152,5 +152,29 @@ describe("handleTranslateAutocomplete", () => {
     await handleTranslateAutocomplete(ctx, interaction);
 
     expect(interaction.calls[0]?.payload).toEqual([{ name: "Allemand", value: "de" }]);
+  });
+
+  it("refuses with an ephemeral notice when rate limited, naming the wait", async () => {
+    const ctx = makeContext({ rateLimiter: alwaysLimited("user", 42) });
+    const interaction = makeChatInputInteraction();
+
+    await handleTranslate(ctx, interaction);
+
+    // Ephemeral, so unlike the public triggers a notice here cannot become the
+    // flood: only the person who asked ever sees it.
+    expect(lastReplyDescription(interaction)).toContain("42");
+    expect(ctx.backend.translateCalls).toEqual([]);
+  });
+
+  it("does not name a wait on the guild budget", async () => {
+    const ctx = makeContext({ rateLimiter: alwaysLimited("guild", 2_400) });
+    const interaction = makeChatInputInteraction();
+
+    await handleTranslate(ctx, interaction);
+
+    // "Try again in 40 minutes" reads as a fault and the reader cannot act on
+    // it anyway; it is someone else's usage they are waiting on.
+    expect(lastReplyDescription(interaction)).not.toContain("2400");
+    expect(ctx.backend.translateCalls).toEqual([]);
   });
 });

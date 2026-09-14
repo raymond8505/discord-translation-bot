@@ -1,7 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { sourceKey } from "../cache.js";
-import { makeContext } from "../fixtures/context.fixture.js";
+import { alwaysLimited, makeContext } from "../fixtures/context.fixture.js";
 import { MESSAGE_ID, lastReplyDescription, lastReplyPayload, makeSelectInteraction } from "../fixtures/interaction.fixture.js";
 import { frenchMessages } from "../fixtures/messages.fixture.js";
 import { makeFakeRedis } from "../fixtures/redis.fixture.js";
@@ -129,5 +129,17 @@ describe("handleLanguageSelect", () => {
 
     expect(interaction.calls).toEqual([]);
     expect(ctx.log.entries[0]?.level).toBe("warn");
+  });
+
+  it("refuses a menu pick when rate limited", async () => {
+    const ctx = makeContext({ rateLimiter: alwaysLimited("user", 9) });
+    const interaction = makeSelectInteraction({ customId: `lang:t:0:auto:${MESSAGE_ID}` });
+
+    await handleLanguageSelect(ctx, interaction);
+
+    // Menus on a public reply are clickable by anyone in the channel, which
+    // makes this the cheapest surface to hammer.
+    expect(lastReplyDescription(interaction)).toContain("9");
+    expect(ctx.backend.translateCalls).toEqual([]);
   });
 });

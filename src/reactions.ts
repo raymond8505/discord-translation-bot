@@ -25,6 +25,7 @@ export interface ReactedMessage {
   readonly content: string | null;
   readonly author: { readonly id: string } | null;
   readonly client: { readonly user: { readonly id: string } | null };
+  readonly guildId: string | null;
   readonly guild: { readonly preferredLocale: string } | null;
   readonly reactions: { readonly cache: ReadonlyMap<string, ReactionSummary> };
   fetch(): Promise<ReactedMessage>;
@@ -39,6 +40,7 @@ export interface FlagReaction extends ReactionSummary {
 
 export interface ReactingUser {
   readonly bot: boolean;
+  readonly id: string;
 }
 
 /** Every flag the bot can't serve shares one bucket: one menu per message, not one per flag. */
@@ -61,6 +63,16 @@ export async function handleFlagReaction(
 ): Promise<void> {
   if (user.bot) return;
   if (!isFlagEmoji(reaction.emoji.name ?? "")) return;
+
+  // Before the partial fetches below, which are themselves API calls: a partial
+  // message still carries guildId, so nothing has to be fetched to decide this.
+  // Silent when over budget, for the same reason as the mention trigger — this
+  // reply is public, and a notice per refused reaction is its own flood.
+  const limit = await ctx.rateLimiter.check({ userId: user.id, guildId: reaction.message.guildId });
+  if (!limit.allowed) {
+    ctx.log.warn(`flag reaction: rate limited (${limit.scope ?? "unknown"} budget); ignoring`);
+    return;
+  }
 
   let full: FlagReaction;
   let message: ReactedMessage;

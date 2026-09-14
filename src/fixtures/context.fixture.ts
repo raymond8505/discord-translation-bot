@@ -3,6 +3,7 @@ import type { AppContext } from "../context.js";
 import { createI18n } from "../i18n/index.js";
 import { createSupportedLanguages } from "../languages.js";
 import type { Logger } from "../log.js";
+import { createRateLimiter, type RateLimiter, type RateLimitScope } from "../rateLimit.js";
 import { makeFakeBackend, type FakeBackend } from "./backend.fixture.js";
 import { makeEnv } from "./env.fixture.js";
 import { makeMessages } from "./messages.fixture.js";
@@ -33,6 +34,20 @@ export interface TestContextOptions {
   backend?: FakeBackend;
   redis?: FakeRedis;
   ttlSeconds?: number;
+  /**
+   * Swapped in whole rather than configured, so a handler test that wants to
+   * see the over-limit path says so in one line instead of issuing 20 requests.
+   * `alwaysLimited()` is the usual argument.
+   */
+  rateLimiter?: RateLimiter;
+}
+
+/** A limiter that refuses everything, for exercising a handler's over-limit branch. */
+export function alwaysLimited(
+  scope: RateLimitScope = "user",
+  retryAfterSeconds = 30,
+): RateLimiter {
+  return { check: async () => ({ allowed: false, scope, retryAfterSeconds }) };
 }
 
 export function makeContext(options: TestContextOptions = {}): TestContext {
@@ -47,6 +62,13 @@ export function makeContext(options: TestContextOptions = {}): TestContext {
     log,
     cache: createCache(redis, env.CACHE_TTL_SECONDS, log),
     languages: createSupportedLanguages(backend, log),
+    rateLimiter:
+      options.rateLimiter ??
+      createRateLimiter(
+        redis,
+        { userPerMinute: env.RATE_LIMIT_USER_PER_MIN, guildPerHour: env.RATE_LIMIT_GUILD_PER_HOUR },
+        log,
+      ),
     i18n: createI18n(makeMessages()),
   };
 }

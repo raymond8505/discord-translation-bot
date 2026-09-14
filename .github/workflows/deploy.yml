@@ -143,6 +143,10 @@ jobs:
               echo "LT_URL=http://libretranslate:5000"
               echo "BACKEND=libretranslate"
               echo "CACHE_TTL_SECONDS=2592000"
+              # Abuse ceilings, not throttles: a fast-moving thread has one
+              # person translating several messages in a row, well under 20/min.
+              echo "RATE_LIMIT_USER_PER_MIN=20"
+              echo "RATE_LIMIT_GUILD_PER_HOUR=2000"
               # Argos model codes (pb = pt-BR), matching the committed locale
               # files in src/i18n/messages. Omitting this loads all ~100
               # models: ~10 GB of disk and far more RAM than the bot serves

@@ -4,6 +4,7 @@ import {
   type ApplicationCommandOptionChoiceData,
 } from "discord.js";
 import type { AppContext } from "../context.js";
+import { rateLimitMessageFor } from "../errors.js";
 import { COMMAND_DESCRIPTION_MAX, localizationsFor } from "../i18n/discord.js";
 import { staticI18n, type Translator } from "../i18n/index.js";
 import { menuLanguages, parseLanguageHint, parseLanguageSpec, resolveTarget } from "../locale.js";
@@ -52,6 +53,8 @@ export const translateCommand = new SlashCommandBuilder()
 /** The slice of `ChatInputCommandInteraction` the handler touches. */
 export interface TranslateInteraction {
   readonly locale: string;
+  readonly user: { readonly id: string };
+  readonly guildId: string | null;
   readonly options: {
     getString(name: string, required?: boolean): string | null;
   };
@@ -67,6 +70,14 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
   // Discord gives us 3 seconds to acknowledge; the backend can take longer.
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const tr = ctx.i18n.forLocale(interaction.locale);
+
+  // Checked after the defer (so the 3s acknowledgement still lands) and before
+  // ctx.languages.get(), which is itself a backend call on a cold start.
+  const limit = await ctx.rateLimiter.check({ userId: interaction.user.id, guildId: interaction.guildId });
+  if (!limit.allowed) {
+    await interaction.editReply(buildNoticeReply(rateLimitMessageFor(limit, tr)));
+    return;
+  }
 
   const text = (interaction.options.getString(TEXT_OPTION, true) ?? "").trim();
   if (!text) {

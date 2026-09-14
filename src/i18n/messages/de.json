@@ -4,6 +4,8 @@
   "error.unavailable": "Das konfigurierte Translation Backend ist nicht verfügbar.",
   "error.invalidResponse": "Der Übersetzungsdienst gab etwas zurück, das ich nicht lesen konnte.",
   "error.generic": "Beim Übersetzen ging etwas schief. Bitte versuchen Sie es noch einmal.",
+  "error.rateLimited.user": "Sie haben gerade um viele Übersetzungen gebeten. Versuchen Sie es erneut in {seconds} Sekunden.",
+  "error.rateLimited.guild": "Dieser Server hat sein Übersetzungskontingent für diese Stunde aufgebraucht. Versuchen Sie es später noch einmal.",
   "translate.nothing": "Nichts zu übersetzen.",
   "translate.unknownLanguage": "Ich kenne keine Sprache namens \"{name}\".",
   "translate.noText": "Diese Nachricht hat keinen Text zu übersetzen.",

@@ -24,6 +24,8 @@ export const validEnv: Env = {
   LT_URL: "http://libretranslate:5000",
   BACKEND: "libretranslate",
   CACHE_TTL_SECONDS: 2_592_000,
+  RATE_LIMIT_USER_PER_MIN: 20,
+  RATE_LIMIT_GUILD_PER_HOUR: 2_000,
 };
 
 export function makeEnv(overrides: Partial<Env> = {}): Env {

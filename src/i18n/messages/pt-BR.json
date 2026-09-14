@@ -4,6 +4,8 @@
   "error.unavailable": "A infraestrutura de tradução configurada não está disponível.",
   "error.invalidResponse": "O serviço de tradução devolveu algo que não pude ler.",
   "error.generic": "Algo deu errado enquanto traduzia. Por favor, tente de novo.",
+  "error.rateLimited.user": "Você pediu muitas traduções em pouco tempo. Tente novamente em {seconds} segundos.",
+  "error.rateLimited.guild": "Este servidor esgotou as traduções desta hora. Tente novamente mais tarde.",
   "translate.nothing": "Nada para traduzir.",
   "translate.unknownLanguage": "Não conheço uma língua chamada \"{name}\".",
   "translate.noText": "Essa mensagem não tem texto para traduzir.",

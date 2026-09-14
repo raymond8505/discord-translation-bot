@@ -16,12 +16,12 @@ image.
 | `env.fixture.ts` | `validEnvSource` / `makeEnvSource()` (raw strings), `validEnv` / `makeEnv()` (parsed) |
 | `languages.fixture.ts` | `libreLanguageCodes` (realistic `/languages` set incl. `zt`/`nb`/`pb`, no `hr`/`lt`), `primaryOnlyCodes`, `makeSupported()` |
 | `libretranslate.fixture.ts` | response payloads, `makeJsonResponse()`, `makeFetch()` (records calls), `makeHangingFetch()` (drives the real timeout path) |
-| `redis.fixture.ts` | `makeFakeRedis()` — in-memory `RedisLike`; SCAN yields an empty page first then `COUNT`-sized pages; `del([])` throws |
+| `redis.fixture.ts` | `makeFakeRedis()` — in-memory `RedisLike` + `RateLimitRedis`; SCAN yields an empty page first then `COUNT`-sized pages; `del([])` throws; `incr` returns the new value so "1 means first in the window" holds; `expireCalls` records TTLs. `makeFailingRedis()` rejects every command, `makeHangingRedis()` never settles |
 | `cache.fixture.ts` | `cacheEntry` / `makeCacheEntry()` |
 | `backend.fixture.ts` | `makeFakeBackend()` — records `translateCalls`, default echo translation `[target] text` |
-| `context.fixture.ts` | `makeContext()` — full `AppContext` over the fakes, `makeRecordingLogger()` |
+| `context.fixture.ts` | `makeContext()` — full `AppContext` over the fakes, `makeRecordingLogger()`, and `alwaysLimited(scope, retryAfter)` for a handler's over-limit branch (pass as `rateLimiter`) |
 | `messages.fixture.ts` | `makeMessages()` — the real `en` plus a partial `fr` (`frenchMessages`), `zh-Hans` without `zh-Hant`, and `nb`; `makeContext()` builds its `i18n` from it so handler tests never depend on generated files |
-| `interaction.fixture.ts` | chat-input / autocomplete / context-menu / help / select fakes with a `calls` log, `lastReplyDescription()`; each takes the `locale` its handler reads |
+| `interaction.fixture.ts` | chat-input / autocomplete / context-menu / help / select fakes with a `calls` log, `lastReplyDescription()`; each takes the `locale` its handler reads, plus `userId`/`guildId` (`USER_ID`/`GUILD_ID` by default, `guildId: null` for a DM) |
 | `message.fixture.ts` | `makeMentionMessage()` for the mention trigger |
 | `reaction.fixture.ts` | `makeFlagReaction()` (siblings seed `reactions.cache` for the duplicate rule; `fetchCalls` proves the partial path), `makeReactingUser()`, and the `FLAGS` / `NON_FLAGS` emoji written as escapes |
 
@@ -35,3 +35,9 @@ image.
   `afterEach`. The heartbeat test writes under `os.tmpdir()`.
 - A cache hit in one step of a multi-step test hides a backend call in the next — vary the target
   (the router test does) rather than clearing the fake.
+- **The default `makeContext()` carries a real limiter over the fake Redis**, so a test that drives
+  one handler many times can exhaust a budget and start getting refusals instead of translations.
+  Reach for `alwaysLimited()` to assert the over-limit branch; for everything else keep the run
+  under `RATE_LIMIT_USER_PER_MIN` (20) or vary the actor with `userId`.
+- Deadline paths (`CHECK_TIMEOUT_MS`) need `vi.useFakeTimers()` plus
+  `await vi.advanceTimersByTimeAsync(...)`, and `vi.useRealTimers()` in a `finally`.

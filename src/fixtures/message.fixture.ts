@@ -2,7 +2,7 @@ import type { MessageMentionsHasOptions } from "discord.js";
 import type { MentionMessage } from "../mentions.js";
 import type { ReplyPayload } from "../reply.js";
 import type { ResponseLog } from "./interaction.fixture.js";
-import { MESSAGE_ID, SPANISH_TEXT } from "./interaction.fixture.js";
+import { GUILD_ID, MESSAGE_ID, SPANISH_TEXT, USER_ID } from "./interaction.fixture.js";
 
 export const BOT_USER_ID = "999999999999999999";
 
@@ -18,6 +18,10 @@ export interface MentionMessageOptions {
   preferredLocale?: string;
   /** `client.user` is null before the gateway is ready. */
   clientReady?: boolean;
+  /** Who sent the tagging message; the actor the rate limiter counts. */
+  authorId?: string;
+  /** `null` models a DM, where there is no guild budget to spend. */
+  guildId?: string | null;
 }
 
 export interface FakeMentionMessage extends MentionMessage, ResponseLog {
@@ -33,8 +37,9 @@ export function makeMentionMessage(options: MentionMessageOptions = {}): FakeMen
     calls,
     hasOptions,
     content: options.content ?? `<@${BOT_USER_ID}>`,
-    author: { bot: options.authorIsBot ?? false },
+    author: { bot: options.authorIsBot ?? false, id: options.authorId ?? USER_ID },
     client: { user: options.clientReady === false ? null : { id: BOT_USER_ID } },
+    guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     guild: { preferredLocale: options.preferredLocale ?? "en-US" },
     reference: parent ? { messageId: parent.id } : null,
     mentions: {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BackendError } from "./backends/index.js";
 import { makeFakeBackend } from "./fixtures/backend.fixture.js";
-import { makeContext } from "./fixtures/context.fixture.js";
+import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
 import { MESSAGE_ID, SPANISH_TEXT, lastReplyDescription, lastReplyPayload } from "./fixtures/interaction.fixture.js";
 import { BOT_USER_ID, makeMentionMessage } from "./fixtures/message.fixture.js";
 import { frenchMessages } from "./fixtures/messages.fixture.js";
@@ -118,5 +118,18 @@ describe("handleMentionMessage", () => {
 
     expect(lastReplyDescription(message)).toMatch(/still starting up/);
     expect(ctx.log.entries.some((e) => e.level === "warn")).toBe(true);
+  });
+
+  it("stays silent when rate limited rather than replying publicly", async () => {
+    const ctx = makeContext({ rateLimiter: alwaysLimited() });
+    const message = makeMentionMessage();
+
+    await handleMentionMessage(ctx, message);
+
+    // A public "slow down" per refused request doubles the flood it is meant
+    // to stop, so the trigger answers nothing and only the log records it.
+    expect(message.calls).toEqual([]);
+    expect(ctx.backend.translateCalls).toEqual([]);
+    expect(ctx.log.entries.some((e) => e.message.includes("rate limited"))).toBe(true);
   });
 });

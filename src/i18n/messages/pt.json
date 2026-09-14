@@ -4,6 +4,8 @@
   "error.unavailable": "O backend de tradução configurado não está disponível.",
   "error.invalidResponse": "O serviço de tradução devolveu algo que eu não conseguia ler.",
   "error.generic": "Algo correu mal enquanto traduzia. Por favor, tente novamente.",
+  "error.rateLimited.user": "Pediu muitas traduções em pouco tempo. Tente novamente em {seconds} segundos.",
+  "error.rateLimited.guild": "Este servidor esgotou as traduções desta hora. Tente novamente mais tarde.",
   "translate.nothing": "Nada para traduzir.",
   "translate.unknownLanguage": "Não conheço uma língua chamada \"{name}\".",
   "translate.noText": "Essa mensagem não tem texto para traduzir.",

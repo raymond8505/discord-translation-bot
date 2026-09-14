@@ -4,6 +4,8 @@
   "error.unavailable": "Le moteur de traduction configuré n'est pas disponible.",
   "error.invalidResponse": "Le service de traduction a rendu quelque chose que je ne pouvais pas lire.",
   "error.generic": "Quelque chose a mal tourné pendant la traduction. Veuillez réessayer.",
+  "error.rateLimited.user": "Vous avez demandé beaucoup de traductions en peu de temps. Réessayez dans {seconds} secondes.",
+  "error.rateLimited.guild": "Ce serveur a épuisé ses traductions pour cette heure. Réessayez plus tard.",
   "translate.nothing": "Rien à traduire.",
   "translate.unknownLanguage": "Je ne connais pas de langue appelée \"{name}\".",
   "translate.noText": "Ce message n'a pas de texte à traduire.",

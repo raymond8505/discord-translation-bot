@@ -1,5 +1,6 @@
 import { MessageFlags } from "discord.js";
 import type { AppContext } from "../context.js";
+import { rateLimitMessageFor } from "../errors.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { isMessageSourceId } from "../sourceId.js";
 import { AUTO_SOURCE, translateWithCache } from "../translate.js";
@@ -8,6 +9,8 @@ import { AUTO_VALUE, parseSelectCustomId } from "./customId.js";
 /** The slice of `StringSelectMenuInteraction` the handler touches. */
 export interface LanguageSelectInteraction {
   readonly locale: string;
+  readonly user: { readonly id: string };
+  readonly guildId: string | null;
   readonly customId: string;
   readonly values: readonly string[];
   readonly message: { readonly flags: { has(flag: MessageFlags): boolean } };
@@ -44,6 +47,16 @@ export async function handleLanguageSelect(
   }
 
   const tr = ctx.i18n.forLocale(interaction.locale);
+
+  // A menu pick re-translates, so it costs the backend exactly what a command
+  // does. Menus on a public reply are clickable by anyone in the channel, which
+  // makes this the cheapest surface to hammer and the one most worth counting.
+  const limit = await ctx.rateLimiter.check({ userId: interaction.user.id, guildId: interaction.guildId });
+  if (!limit.allowed) {
+    await interaction.editReply(buildNoticeReply(rateLimitMessageFor(limit, tr)));
+    return;
+  }
+
   const picked = interaction.values[0];
   if (!picked) {
     await interaction.editReply(buildNoticeReply(tr.t("select.none")));

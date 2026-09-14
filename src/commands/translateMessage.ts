@@ -1,5 +1,6 @@
 import { ApplicationCommandType, ContextMenuCommandBuilder, MessageFlags } from "discord.js";
 import type { AppContext } from "../context.js";
+import { rateLimitMessageFor } from "../errors.js";
 import { COMMAND_NAME_MAX, localizationsFor } from "../i18n/discord.js";
 import { staticI18n } from "../i18n/index.js";
 import { resolveTarget } from "../locale.js";
@@ -18,6 +19,8 @@ export const translateMessageCommand = new ContextMenuCommandBuilder()
 /** The slice of `MessageContextMenuCommandInteraction` the handler touches. */
 export interface TranslateMessageInteraction {
   readonly locale: string;
+  readonly user: { readonly id: string };
+  readonly guildId: string | null;
   readonly targetMessage: { readonly id: string; readonly content: string };
   deferReply(options: { flags: MessageFlags.Ephemeral }): Promise<unknown>;
   editReply(payload: ReplyPayload): Promise<unknown>;
@@ -29,6 +32,12 @@ export async function handleTranslateMessage(
 ): Promise<void> {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const tr = ctx.i18n.forLocale(interaction.locale);
+
+  const limit = await ctx.rateLimiter.check({ userId: interaction.user.id, guildId: interaction.guildId });
+  if (!limit.allowed) {
+    await interaction.editReply(buildNoticeReply(rateLimitMessageFor(limit, tr)));
+    return;
+  }
 
   const { id, content } = interaction.targetMessage;
   if (!content.trim()) {
