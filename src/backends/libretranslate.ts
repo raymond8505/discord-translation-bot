@@ -19,9 +19,27 @@ function isTimeout(err: unknown): boolean {
   );
 }
 
+/**
+ * The cause's `code`, not its message. Node's fetch wraps a connection failure
+ * as `TypeError: fetch failed` whose cause reads `connect ECONNREFUSED
+ * 172.18.0.3:5000` — the internal address of the backend, which then sits in
+ * the logs of every outage. The code (`ECONNREFUSED`, `ENOTFOUND`,
+ * `ECONNRESET`) is the part worth keeping: it says what went wrong without
+ * saying where the service lives.
+ */
+function causeCode(err: Error): string | undefined {
+  const cause: unknown = err.cause;
+  if (cause instanceof Error) {
+    const code: unknown = (cause as { code?: unknown }).code;
+    if (typeof code === "string") return code;
+  }
+  return undefined;
+}
+
 function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.cause instanceof Error ? `${err.message} (${err.cause.message})` : err.message;
-  return String(err);
+  if (!(err instanceof Error)) return String(err);
+  const code = causeCode(err);
+  return code === undefined ? err.message : `${err.message} (${code})`;
 }
 
 export class LibreTranslateBackend implements TranslationBackend {
