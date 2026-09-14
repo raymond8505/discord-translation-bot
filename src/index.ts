@@ -19,7 +19,9 @@ const SHUTDOWN_GRACE_MS = 5_000;
 async function main(): Promise<void> {
   const env = loadEnv();
 
-  const redis = createClient({ url: env.REDIS_URL });
+  // password is passed separately rather than embedded in REDIS_URL so the one
+  // value can also reach the server's --requirepass without being parsed back out.
+  const redis = createClient({ url: env.REDIS_URL, password: env.REDIS_PASSWORD });
   // Without a listener a dropped connection is an unhandled 'error' event and kills the process.
   redis.on("error", (err: unknown) => log.error("redis client error", err));
   await redis.connect();

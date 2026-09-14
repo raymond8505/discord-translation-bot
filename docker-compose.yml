@@ -58,14 +58,23 @@ services:
     # the limit gets the container OOM-killed by the kernel; with it, redis evicts
     # its least-recently-used translations and keeps serving. Eviction is the
     # correct failure mode for a cache — every key here is reconstructible.
+    #
+    # Shell form so --requirepass appears only when REDIS_PASSWORD is set: passing
+    # `--requirepass ""` is not the same as omitting it. `$$` escapes compose's own
+    # interpolation, leaving the expansion to the container's shell at start-up.
     command:
-      - redis-server
-      - --appendonly
-      - "yes"
-      - --maxmemory
-      - 384mb
-      - --maxmemory-policy
-      - allkeys-lru
+      - sh
+      - -c
+      - >-
+        exec redis-server --appendonly yes --maxmemory 384mb
+        --maxmemory-policy allkeys-lru
+        $${REDIS_PASSWORD:+--requirepass "$$REDIS_PASSWORD"}
+    environment:
+      # Key-only: compose omits it entirely when .env does not set it, which is
+      # what keeps the unauthenticated default working. Never give it a
+      # `${REDIS_PASSWORD:-}` default — that renders set-but-empty and
+      # scripts/validate-compose-env.sh fails the build on it.
+      REDIS_PASSWORD:
     volumes:
       - redis-data:/data
     restart: unless-stopped
@@ -83,7 +92,17 @@ services:
     mem_limit: 512m
     pids_limit: 128
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # Must authenticate too, or a password-protected server answers PING with
+      # NOAUTH and the container never reports healthy. --no-auth-warning keeps
+      # the password off stderr.
+      # `$$` again: with a single `$` compose would substitute the password at
+      # config time and bake it into the container spec, where `docker inspect`
+      # prints it. Expanding in the container's shell keeps it out of there.
+      test:
+        - CMD-SHELL
+        - >-
+          redis-cli $${REDIS_PASSWORD:+--no-auth-warning -a "$$REDIS_PASSWORD"} ping
+          | grep -q PONG
       interval: 10s
       timeout: 3s
       retries: 5

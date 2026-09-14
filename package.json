@@ -31,7 +31,7 @@
     "docker:logs": "docker compose logs -f bot",
     "docker:logs:all": "docker compose logs -f",
     "docker:ps": "docker compose ps",
-    "docker:cache": "docker compose exec redis redis-cli --scan --pattern 'tr:*'",
+    "docker:cache": "docker compose exec redis sh -c 'redis-cli ${REDIS_PASSWORD:+--no-auth-warning -a \"$REDIS_PASSWORD\"} --scan --pattern \"tr:*\"'",
     "docker:languages": "docker compose exec bot node -e \"fetch('http://libretranslate:5000/languages').then(r=>r.json()).then(l=>console.log(l.map(x=>x.code).join(', ')))\"",
     "postinstall": "node .husky/install.mjs"
   },

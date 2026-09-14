@@ -80,11 +80,16 @@ jobs:
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
           GUILD_ID: ${{ secrets.GUILD_ID }}
           GH_DEPLOY_KEY: ${{ secrets.GH_DEPLOY_KEY }}
+          # Optional, and deliberately absent from the `:?` guards below: an
+          # unset secret arrives blank, blankToUndefined() in src/env.ts reads
+          # that as undefined, and Redis stays unauthenticated on its own
+          # network. Set the secret to turn authentication on.
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: DISCORD_TOKEN,DISCORD_CLIENT_ID,GUILD_ID,GH_DEPLOY_KEY
+          envs: DISCORD_TOKEN,DISCORD_CLIENT_ID,GUILD_ID,GH_DEPLOY_KEY,REDIS_PASSWORD
           script: |
             set -e
 
@@ -134,6 +139,7 @@ jobs:
               echo "DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}"
               echo "GUILD_ID=${GUILD_ID}"
               echo "REDIS_URL=redis://redis:6379"
+              echo "REDIS_PASSWORD=${REDIS_PASSWORD}"
               echo "LT_URL=http://libretranslate:5000"
               echo "BACKEND=libretranslate"
               echo "CACHE_TTL_SECONDS=2592000"

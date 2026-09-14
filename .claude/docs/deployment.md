@@ -54,6 +54,31 @@ Three details are load-bearing and will break the stack if changed carelessly:
 LibreTranslate is deliberately **not** `read_only`: unlike the bot it writes throughout its own
 filesystem (venv caches, Argos staging), and confining it would mean a tmpfs per path.
 
+## Optional Redis authentication
+
+`REDIS_PASSWORD` is optional and unset by default, which leaves Redis unauthenticated — correct
+when it is alone on its compose network, wrong when the host runs anything else, since any other
+container on that network could otherwise read every cached message. One variable drives both
+halves (`--requirepass` and the bot's client) so the two cannot drift.
+
+The conditional is `${REDIS_PASSWORD:+...}`, in the redis `command:`, the healthcheck, and the
+`docker:cache` script. Three things about it are deliberate:
+
+- **`:+`, not `+`.** `.env.example` carries `REDIS_PASSWORD=` blank and an unset GitHub secret
+  arrives blank, so "empty" must mean "no password"; `+` would expand on an empty-but-set value and
+  pass `--requirepass ""`.
+- **`$$`, not `$`.** Compose interpolates a single `$` at config time, which bakes the password
+  into the container spec where `docker inspect` prints it. `$$` leaves the expansion to the
+  container's shell. Verified: `docker inspect` shows the literal `${REDIS_PASSWORD:+...}`.
+- **The healthcheck must authenticate too**, or a password-protected server answers `PING` with
+  `NOAUTH`, the container never reports healthy, and the bot's `depends_on` never releases.
+
+The bot passes `password` to `createClient` alongside `url` rather than embedding credentials in
+`REDIS_URL`; node-redis converts a bare `password` into a credentials provider, and both forms were
+checked against a live authenticated server. Verified end to end both ways: with the password set,
+an unauthenticated `redis-cli ping` is refused with `NOAUTH` while the bot connects; with it unset,
+everything works as before.
+
 ## Adding an env var
 
 1. Add it to the zod schema **and** to `runtimeEnv()` in `src/env.ts` as a literal `process.env.X`.

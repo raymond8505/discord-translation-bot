@@ -9,6 +9,14 @@ export const envSchema = z.object({
   DISCORD_CLIENT_ID: snowflake,
   GUILD_ID: snowflake,
   REDIS_URL: z.url({ protocol: /^rediss?$/ }),
+  /**
+   * Optional. Unset means an unauthenticated Redis, which is fine when it is
+   * alone on the compose network and wrong when the host runs anything else:
+   * without it, any other container on that network can read every cached
+   * message. One variable feeds both halves — `--requirepass` on the server and
+   * the client's `password` — so the two can never drift apart.
+   */
+  REDIS_PASSWORD: z.string().min(1).optional(),
   LT_URL: z.url({ protocol: /^https?$/ }),
   BACKEND: z.enum(["libretranslate", "ollama"]).default("libretranslate"),
   CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(2_592_000),
@@ -30,6 +38,7 @@ export function runtimeEnv(): EnvSource {
     DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
     GUILD_ID: process.env.GUILD_ID,
     REDIS_URL: process.env.REDIS_URL,
+    REDIS_PASSWORD: process.env.REDIS_PASSWORD,
     LT_URL: process.env.LT_URL,
     BACKEND: process.env.BACKEND,
     CACHE_TTL_SECONDS: process.env.CACHE_TTL_SECONDS,

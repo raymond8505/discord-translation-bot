@@ -50,6 +50,21 @@ describe("loadEnv", () => {
     );
   });
 
+  it("leaves REDIS_PASSWORD undefined when absent or blank", () => {
+    // Both spellings must mean "unauthenticated", not "authenticate with the
+    // empty string": an unset GitHub secret reaches the container as a blank.
+    expect(loadEnv(makeEnvSource()).REDIS_PASSWORD).toBeUndefined();
+    expect(
+      loadEnv(makeEnvSource({ REDIS_PASSWORD: "" })).REDIS_PASSWORD,
+    ).toBeUndefined();
+  });
+
+  it("keeps REDIS_PASSWORD when set", () => {
+    expect(
+      loadEnv(makeEnvSource({ REDIS_PASSWORD: "hunter2" })).REDIS_PASSWORD,
+    ).toBe("hunter2");
+  });
+
   it("strips keys the schema does not know", () => {
     const env = loadEnv(makeEnvSource({ LT_LOAD_ONLY: "en,fr" }));
     expect(env).not.toHaveProperty("LT_LOAD_ONLY");
