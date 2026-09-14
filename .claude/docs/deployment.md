@@ -21,6 +21,39 @@ difference is an `.env` value; there is no `docker-compose.override.yml` and non
   on `discord-translation-bot_default`.
 - `develop.watch` on the bot service is inert unless `docker compose watch` is run.
 
+## Image pins
+
+Neither third-party image floats. `libretranslate/libretranslate` is pinned to an exact version
+because every deploy runs `compose up --build`, so `latest` let an unreviewed upstream release pull
+itself onto the VPS — into the one container that sees the plaintext of every translated message.
+`redis` is pinned to the **minor** (`7.4-alpine`), which still takes patch releases and therefore
+security fixes, but never jumps a major behind an unattended deploy. Bump either deliberately.
+
+## Container confinement
+
+All three services run with `no-new-privileges` and `cap_drop: [ALL]`, and all three carry
+`mem_limit`/`pids_limit` — the VPS is shared with another project, so a leak or a runaway loop in
+one container must not take the host down with it.
+
+Three details are load-bearing and will break the stack if changed carelessly:
+
+- **The bot's `read_only: true` requires its `tmpfs: [/tmp]`.** `src/health.ts` touches
+  `/tmp/discord-translation-bot.healthy` every 30 s and the HEALTHCHECK reads that mtime, so a
+  read-only root without the tmpfs reports the container unhealthy for as long as it runs.
+- **Redis runs as `user: "999:1000"`.** The image's entrypoint otherwise starts as root and
+  `gosu`es down, chowning `/data` on the way — which needs `CAP_CHOWN` and `CAP_DAC_OVERRIDE`.
+  Under `cap_drop: ALL` that entrypoint fails with `find: ./appendonlydir: Permission denied` and
+  the container never goes healthy; root without those caps is subject to ordinary permission
+  checks like anyone else. 999:1000 is the uid:gid that already owns the volume, so starting as it
+  needs no capabilities at all.
+- **Redis's `--maxmemory 384mb` must stay below its `mem_limit`.** Without it a full cache gets the
+  container OOM-killed by the kernel; with it, `allkeys-lru` evicts the least-recently-used
+  translations and redis keeps serving. Eviction is the right failure mode here — every key in this
+  cache is reconstructible from the backend.
+
+LibreTranslate is deliberately **not** `read_only`: unlike the bot it writes throughout its own
+filesystem (venv caches, Argos staging), and confining it would mean a tmpfs per path.
+
 ## Adding an env var
 
 1. Add it to the zod schema **and** to `runtimeEnv()` in `src/env.ts` as a literal `process.env.X`.

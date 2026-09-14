@@ -12,6 +12,22 @@ services:
     # tini forwards SIGTERM to node so `compose stop` triggers the graceful shutdown.
     init: true
     restart: unless-stopped
+    # The bot talks outbound to Discord and the two sibling services and writes
+    # nothing but its heartbeat, so it needs no capabilities and no writable root.
+    # The tmpfs is not optional: src/health.ts touches /tmp/<name>.healthy every
+    # 30s and the HEALTHCHECK reads its mtime, so a read-only root without it
+    # reports the container unhealthy for as long as it runs.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The VPS is shared with another project. Caps here are what stop a leak or a
+    # runaway loop in one container from taking the whole host down with it.
+    mem_limit: 512m
+    pids_limit: 256
     depends_on:
       redis:
         condition: service_healthy
@@ -34,12 +50,38 @@ services:
         max-file: "3"
 
   redis:
-    image: redis:7-alpine
+    # Pinned to the minor, not `7-alpine`: patch releases still arrive (so security
+    # fixes do), but a major-version jump never happens behind an unattended deploy.
+    image: redis:7.4-alpine
     container_name: discord-translation-bot-redis
-    command: ["redis-server", "--appendonly", "yes"]
+    # maxmemory is set below mem_limit on purpose. Without it, a cache that fills
+    # the limit gets the container OOM-killed by the kernel; with it, redis evicts
+    # its least-recently-used translations and keeps serving. Eviction is the
+    # correct failure mode for a cache — every key here is reconstructible.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 384mb
+      - --maxmemory-policy
+      - allkeys-lru
     volumes:
       - redis-data:/data
     restart: unless-stopped
+    # Start as redis (999:1000, the uid that owns the volume) instead of letting
+    # the image's entrypoint start as root and gosu down to it. That entrypoint
+    # chowns the data dir first, which needs CAP_CHOWN and CAP_DAC_OVERRIDE — so
+    # with cap_drop: ALL it fails "find: ./appendonlydir: Permission denied" and
+    # the container never becomes healthy. Starting as the owner needs no
+    # capabilities at all, which is the stronger position anyway.
+    user: "999:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    pids_limit: 128
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -52,7 +94,11 @@ services:
         max-file: "3"
 
   libretranslate:
-    image: libretranslate/libretranslate:latest
+    # Pinned, not `latest`. Every deploy runs `compose up --build`, so `latest`
+    # let an unreviewed upstream release pull itself onto the VPS — into the one
+    # container that sees the plaintext of every translated message. Bump this
+    # deliberately: check the release notes, then change the tag here.
+    image: libretranslate/libretranslate:v1.9.6
     container_name: discord-translation-bot-libretranslate
     environment:
       # Key-only on purpose. Compose renders a key with no value as null and
@@ -67,6 +113,16 @@ services:
     volumes:
       - lt-models:/home/libretranslate/.local:rw
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # No read_only here: unlike the bot, this image writes throughout its own
+    # filesystem (venv caches, Argos staging) and confining it would need a tmpfs
+    # per path. Loading the seven models plus the Python/torch runtime is the
+    # memory floor, so this cap is high — it is a runaway guard, not a diet.
+    mem_limit: 4g
+    pids_limit: 512
     healthcheck:
       test: ["CMD-SHELL", "./venv/bin/python scripts/healthcheck.py"]
       interval: 30s
