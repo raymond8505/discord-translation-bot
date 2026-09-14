@@ -17,7 +17,7 @@
   "reply.detected": "erkannt: {language}",
   "reply.cached": "zwischengespeichert",
   "reply.sameLanguage": "bereits in der Zielsprache",
-  "reply.uncertain.name": "Kann Quellsprache nicht automatisch erkennen",
+  "reply.uncertain.name": "Die Ausgangssprache ist eine Vermutung",
   "reply.uncertain.value": "Wählen Sie die Quelle in den Menüs unten, antworten Sie mit `@bot <source>:<target>` (z. B. `fr:en`) oder verwenden Sie `/translate` mit der Option `source`.",
   "menu.auto": "Autoerkennung",
   "menu.from": "Übersetzen von",

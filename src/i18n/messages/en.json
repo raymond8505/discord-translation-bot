@@ -17,7 +17,7 @@
   "reply.detected": "detected: {language}",
   "reply.cached": "cached",
   "reply.sameLanguage": "already in the target language",
-  "reply.uncertain.name": "Couldn't auto-detect source language",
+  "reply.uncertain.name": "The source language is a guess",
   "reply.uncertain.value": "Pick the source in the menus below, reply with `@bot <source>:<target>` (e.g. `fr:en`), or use `/translate` with its `source` option.",
   "menu.auto": "Auto-detect",
   "menu.from": "Translate from",

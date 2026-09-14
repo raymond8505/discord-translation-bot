@@ -22,7 +22,7 @@ LibreTranslate (Argos models, entirely local, no third-party API).
   language in the table — gets a reply saying so, with the target menus to
   pick by hand. Reactions that aren't flags are ignored.
 - Source language is auto-detected and the reply shows the detection
-  confidence. Below 50% the reply says so and how to force it: `@bot fr:en`
+  confidence. Below 25% the reply says so and how to force it: `@bot fr:en`
   (source:target), `@bot fr:` (source only), or `/translate` with `source:`.
   A forced source also replaces the cached translation for everyone.
 - Every reply carries **source and target menus** (two rows each): the

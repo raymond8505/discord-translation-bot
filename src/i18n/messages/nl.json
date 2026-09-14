@@ -17,7 +17,7 @@
   "reply.detected": "gedetecteerd: {language}",
   "reply.cached": "gecached",
   "reply.sameLanguage": "al in de doeltaal",
-  "reply.uncertain.name": "Kon brontaal niet automatisch detecteren",
+  "reply.uncertain.name": "De brontaal is een gok",
   "reply.uncertain.value": "Kies de bron in de onderstaande menu's, antwoord met `@bot <source>:<target>` (bijv. `fr:en`), of gebruik `/translate` met zijn `source` optie.",
   "menu.auto": "Automatisch detecteren",
   "menu.from": "Vertalen van",

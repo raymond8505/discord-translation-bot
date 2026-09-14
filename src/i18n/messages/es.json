@@ -17,7 +17,7 @@
   "reply.detected": "detectado: {language}",
   "reply.cached": "caché",
   "reply.sameLanguage": "ya en el idioma objetivo",
-  "reply.uncertain.name": "No se pudo detectar automáticamente el idioma de origen",
+  "reply.uncertain.name": "El idioma de origen es una suposición",
   "reply.uncertain.value": "Elija la fuente en los menús de abajo, responda con `@bot <source>:<target>` (por ejemplo, `fr:en`), o utilice `/translate` con su opción `source`.",
   "menu.auto": "Detección automática",
   "menu.from": "Traducir del",

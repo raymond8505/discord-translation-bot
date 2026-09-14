@@ -18,8 +18,17 @@ export const EMBED_DESCRIPTION_MAX = 4096;
 const OPTIONS_PER_MENU = 25;
 const MENUS_PER_ROLE = 2;
 
-/** Below this, LibreTranslate's guess is shown with a "not sure" note and how to force the source. */
-export const LOW_CONFIDENCE_PERCENT = 50;
+/**
+ * Below this, the guess is still shown, with a field pointing at the source
+ * menus. The floor is low because a *correct* detection scores low routinely:
+ * `libretranslate/detect.py` matches a dictionary under 20 characters ("how
+ * are you?" comes back as English at 30), and above that filters langdetect's
+ * candidates to the loaded language set without renormalizing, discarding the
+ * probability it drops rather than redistributing it. English suffers worst —
+ * its nearest candidates are Dutch, German, Afrikaans and Danish, and only the
+ * first two are in the set the bot loads. At 50 this fired on ordinary English.
+ */
+export const LOW_CONFIDENCE_PERCENT = 25;
 
 export interface TranslationReplyInput {
   readonly sourceId: string;

@@ -54,10 +54,20 @@ describe("buildTranslationReply", () => {
     expect(confident?.footer?.text).toContain("detected: Spanish (93%)");
     expect(confident?.fields).toBeUndefined();
 
-    const unsure = build({ entry: makeCacheEntry({ confidence: 45 }) }).embeds[0]?.toJSON();
-    expect(unsure?.footer?.text).toContain("detected: Spanish (45%)");
-    expect(unsure?.fields?.[0]?.name).toMatch(/auto-detect/i);
+    const unsure = build({ entry: makeCacheEntry({ confidence: 15 }) }).embeds[0]?.toJSON();
+    expect(unsure?.footer?.text).toContain("detected: Spanish (15%)");
+    expect(unsure?.fields?.[0]?.name).toMatch(/guess/i);
     expect(unsure?.fields?.[0]?.value).toContain("fr:en");
+  });
+
+  // A correct detection lands in the 30s-40s routinely — a short-text
+  // dictionary match, or langdetect probability LibreTranslate discarded when
+  // it filtered to the loaded languages — so flagging those cried wolf.
+  it("leaves a weak but usable score unflagged", () => {
+    const weak = build({ entry: makeCacheEntry({ confidence: 45 }) }).embeds[0]?.toJSON();
+
+    expect(weak?.footer?.text).toContain("detected: Spanish (45%)");
+    expect(weak?.fields).toBeUndefined();
   });
 
   it("labels a forced source as given rather than detected", () => {

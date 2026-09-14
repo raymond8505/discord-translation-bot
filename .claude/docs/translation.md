@@ -55,9 +55,24 @@ pattern accepts `xx`, `xxx`, and `xx-Xxxx` forms.
 
 `TranslateResult.confidence` (0-100) is LibreTranslate's `detectedLanguage.confidence` and is kept in
 the cache entry. `src/reply.ts` renders `detected: French (45%)` and, below `LOW_CONFIDENCE_PERCENT`
-(50), adds a "not sure" field telling the user how to force the source. An explicit source stores no
-confidence and renders as `source: French`. Short inputs with proper names are where LibreTranslate
-guesses badly ("j'adore kirsten" → Spanish at 45%); it only considers loaded languages.
+(25), adds a "the source language is a guess" field telling the user how to force the source. An
+explicit source stores no confidence and renders as `source: French`.
+
+**Why the floor is 25 and not 50.** A *correct* detection scores under 50 often enough that the field
+was firing on ordinary English. `libretranslate/detect.py` has two paths, and both produce honest low
+scores:
+
+- Under 20 characters it uses lexilang, a dictionary matcher whose confidences are small by nature.
+  Measured against the running stack: `"how are you?"` → `en` at **30**, while `"hello"` → 90.
+- At 20+ characters it uses langdetect, then filters the candidates to the loaded language set
+  **without renormalizing** — probability lost to a language that is not loaded is discarded, not
+  redistributed. English is hit hardest, since its nearest langdetect candidates are Dutch, German,
+  Afrikaans and Danish and only the first two are among the seven the bot loads.
+
+Full English sentences score 100, so 25 still leaves real doubt flagged. A failure anywhere in
+`detect()` returns the literal `Language("en", 0)`, so a give-up is indistinguishable from English at
+0% and reaches the reply as one — that case stays flagged (`undetectableResponse` in
+`libretranslate.fixture.ts` is that shape; `"🎉🎉"` reproduces it live).
 
 ## Cache
 
