@@ -7,6 +7,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# The repo is public, so `pull_request` runs a fork's code. Nothing here writes to
+# the repo, so the token that code runs beside gets read-only: without this block it
+# inherits the repository default, which is frequently read/write.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -50,13 +56,25 @@ jobs:
     # matters for workflow_dispatch, which has no branch filter: the ssh script
     # resets the VPS to origin/main, so a dispatch from any other branch would
     # report a deploy of code that was never deployed.
+    # The owner guard is for forks: a fork's own push to main would otherwise queue a
+    # deploy that can only fail, against secrets it does not have.
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
+      && github.repository_owner == 'raymond8505'
+
+    # Two deploys at once would race the same `git reset --hard` and `compose up` in
+    # one directory on the VPS. Queue them; never cancel a deploy mid-flight, which
+    # could leave the checkout and the running containers at different commits.
+    concurrency:
+      group: deploy-vps
+      cancel-in-progress: false
 
     steps:
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.2.0
+        # SHA-pinned, not tag-pinned: a tag can be moved to new code, and this action
+        # is handed every secret in the deploy. Bump by resolving the tag to its SHA.
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
@@ -70,15 +88,30 @@ jobs:
           script: |
             set -e
 
-            # Set up deploy key for private repo access
+            # A missing repository secret arrives as an empty string, not as an unset
+            # variable, and would otherwise be written into .env as `DISCORD_TOKEN=`.
+            # The container then crash-loops on a zod error one job later; fail here
+            # instead, naming the secret. `:?` treats empty as unset, which is what we want.
+            : "${DISCORD_TOKEN:?missing repository secret DISCORD_TOKEN}"
+            : "${DISCORD_CLIENT_ID:?missing repository secret DISCORD_CLIENT_ID}"
+            : "${GUILD_ID:?missing repository secret GUILD_ID}"
+            : "${GH_DEPLOY_KEY:?missing repository secret GH_DEPLOY_KEY}"
+
+            # Set up deploy key for private repo access. The write happens under
+            # umask 077 rather than being chmod'd afterwards: the chmod leaves a
+            # window in which any other account on the VPS can read the key.
+            # printf '%s\n' is load-bearing — GitHub strips a multiline secret's
+            # trailing newline and '%s' alone yields "error in libcrypto".
             mkdir -p ~/.ssh && chmod 700 ~/.ssh
-            printf '%s\n' "${GH_DEPLOY_KEY}" > ~/.ssh/github_discord_translation_bot
+            ( umask 077; printf '%s\n' "${GH_DEPLOY_KEY}" > ~/.ssh/github_discord_translation_bot )
             chmod 600 ~/.ssh/github_discord_translation_bot
             ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null || true
             export GIT_SSH_COMMAND="ssh -i ~/.ssh/github_discord_translation_bot"
 
             DEPLOY_PATH="${{ secrets.VPS_DEPLOY_PATH }}"
-            REPO="git@github.com:raymond8505/discord-translation-bot.git"
+            : "${DEPLOY_PATH:?missing repository secret VPS_DEPLOY_PATH}"
+            # Derived, not hardcoded, so a fork deploying to its own VPS clones itself.
+            REPO="git@github.com:${{ github.repository }}.git"
 
             if [ -d "${DEPLOY_PATH}/.git" ]; then
               cd "${DEPLOY_PATH}"
@@ -92,6 +125,10 @@ jobs:
 
             # Runtime env for docker compose. Service URLs, backend and TTL are
             # literals: change them here (and in .env.example) to change prod.
+            # Written under umask 077 so the bot token is never briefly world-readable;
+            # the chmod covers an .env left behind by an earlier, looser deploy, which
+            # the umask alone would not re-mode.
+            ( umask 077
             {
               echo "DISCORD_TOKEN=${DISCORD_TOKEN}"
               echo "DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}"
@@ -106,6 +143,8 @@ jobs:
               # languages for.
               echo "LT_LOAD_ONLY=en,es,fr,de,nl,pt,pb"
             } > .env
+            )
+            chmod 600 .env
 
             docker compose up -d --build --remove-orphans
 

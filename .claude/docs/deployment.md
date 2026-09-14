@@ -53,6 +53,35 @@ Secrets: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `GUILD_ID`, `GH_DEPLOY_KEY`, `VPS
 `VPS_USER`, `VPS_SSH_KEY`, `VPS_DEPLOY_PATH`. Service URLs, `BACKEND` and `CACHE_TTL_SECONDS` are
 literals in the heredoc; change production config by editing them there.
 
+Each required secret is asserted with `: "${VAR:?...}"` before anything is written. A missing
+repository secret arrives as an **empty string**, not as an unset variable, so without the guard it
+lands in `.env` as `DISCORD_TOKEN=` and the failure surfaces a job later as a zod error in a
+crash-looping container. `:?` treats empty as unset, which is exactly the needed behaviour.
+
+Both secret-bearing writes — the deploy key and `.env` — happen inside `( umask 077; ... )`, then
+get a `chmod 600`. Both halves are load-bearing and neither replaces the other: the umask closes
+the window between creation and chmod, and the chmod re-modes an `.env` left at `644` by an earlier
+deploy, which a umask cannot do to an existing file. Verified on Alpine: default write is `644`,
+the hardened write is `600`.
+
+## Public-repo CI posture
+
+The repo is public, so `pull_request` runs fork code on GitHub's runners:
+
+- A top-level `permissions: contents: read` keeps the `GITHUB_TOKEN` that code runs beside
+  read-only. Without the block it inherits the *repository* default, which is often read/write.
+  Nothing in this workflow writes to the repo, so nothing needs more.
+- `appleboy/ssh-action` is **pinned by commit SHA** with the version in a trailing comment, because
+  it is handed every deploy secret and a tag can be repointed at new code. Bump it by resolving the
+  new tag to a SHA (`gh api repos/appleboy/ssh-action/git/ref/tags/vX.Y.Z`), not by editing the
+  comment. First-party `actions/*` stay on major tags.
+- The `deploy` job's `if:` carries a `github.repository_owner` guard so a fork's push to its own
+  `main` does not queue a deploy that can only fail, and `REPO` is derived from
+  `github.repository` so a fork clones itself rather than this repo.
+- `concurrency: { group: deploy-vps, cancel-in-progress: false }` queues deploys instead of racing
+  two `git reset --hard`/`compose up` runs in one directory. Never set `cancel-in-progress: true`
+  here: a cancelled deploy can leave the checkout and the running containers at different commits.
+
 Two of those are OpenSSH **private** keys, and they authenticate opposite directions:
 `VPS_SSH_KEY` is how `appleboy/ssh-action` logs into the VPS (its public half is in the VPS user's
 `authorized_keys`), `GH_DEPLOY_KEY` is how the VPS clones this repo (its public half is a
