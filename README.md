@@ -268,13 +268,16 @@ is needed even while the repo is public.
 Prerequisites on the VPS: Docker with the Compose plugin, and the `VPS_USER`
 able to run `docker` without `sudo`.
 
-Only a push to `main` deploys. `workflow_dispatch` runs `test` and `build`
-but skips `deploy` (`if: github.event_name == 'push'`), so it cannot be used
-to check the secrets — push an empty commit instead:
+Deploys run on a push to `main` **and** on a manual `workflow_dispatch` from
+`main` — use the Actions tab's "Run workflow" to redeploy without a commit. The
+`main` guard matters because a dispatch carries no branch filter of its own,
+while the ssh script resets the VPS to `origin/main` regardless: a dispatch from
+another branch would report deploying code it never deployed. A pull request
+never deploys.
 
-```bash
-git commit --allow-empty -m "chore: trigger deploy" && git push
-```
+The job also checks `github.repository_owner`, so a fork's own push to `main`
+does not queue a deploy against secrets it does not have. Change that value if
+you fork this and deploy it yourself.
 
 **First deploy:** LibreTranslate downloads the models named by `LT_LOAD_ONLY`
 into the `lt-models` volume. The deploy does not wait for it; the bot comes up

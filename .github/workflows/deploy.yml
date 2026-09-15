@@ -123,9 +123,13 @@ jobs:
             : "${GUILD_ID:?missing repository secret GUILD_ID}"
             : "${GH_DEPLOY_KEY:?missing repository secret GH_DEPLOY_KEY}"
 
-            # Set up deploy key for private repo access. The write happens under
-            # umask 077 rather than being chmod'd afterwards: the chmod leaves a
-            # window in which any other account on the VPS can read the key.
+            # Set up the deploy key. It authenticates the SSH clone below, which
+            # needs credentials whether or not the repo is public — this one is,
+            # so the key is not what keeps the source private, and the deploy
+            # would work over an anonymous HTTPS remote instead.
+            # The write happens under umask 077 rather than being chmod'd
+            # afterwards: the chmod leaves a window in which any other account on
+            # the VPS can read the key.
             # printf '%s\n' is load-bearing — GitHub strips a multiline secret's
             # trailing newline and '%s' alone yields "error in libcrypto".
             mkdir -p ~/.ssh && chmod 700 ~/.ssh
