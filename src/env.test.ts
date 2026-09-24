@@ -5,7 +5,7 @@ import { makeEnvSource } from "./fixtures/env.fixture.js";
 describe("loadEnv", () => {
   it("parses a complete source and coerces the TTL to a number", () => {
     const env = loadEnv(makeEnvSource());
-    expect(env.CACHE_TTL_SECONDS).toBe(2_592_000);
+    expect(env.CACHE_TTL_SECONDS).toBe(86_400);
     expect(env.BACKEND).toBe("libretranslate");
   });
 
@@ -14,7 +14,7 @@ describe("loadEnv", () => {
       makeEnvSource({ BACKEND: undefined, CACHE_TTL_SECONDS: "" }),
     );
     expect(env.BACKEND).toBe("libretranslate");
-    expect(env.CACHE_TTL_SECONDS).toBe(2_592_000);
+    expect(env.CACHE_TTL_SECONDS).toBe(86_400);
   });
 
   it("names every missing required var in the error", () => {

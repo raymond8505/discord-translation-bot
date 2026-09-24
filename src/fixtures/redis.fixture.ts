@@ -11,7 +11,7 @@ export interface FakeRedis extends RedisLike, RateLimitRedis {
   readonly store: Map<string, FakeRedisRecord>;
   /** Every `del` call's argument, in order. */
   readonly delCalls: string[][];
-  /** Every `expire` call, in order, so a test can prove a window is bounded. */
+  /** Every `expire` and `getEx` call, in order: a bounded window, or a slid TTL. */
   readonly expireCalls: Array<{ key: string; seconds: number }>;
 }
 
@@ -26,6 +26,7 @@ export function makeFailingRedis(message = "ECONNREFUSED"): FakeRedis {
   return {
     ...makeFakeRedis(),
     get: fail,
+    getEx: fail,
     set: fail,
     del: fail,
     incr: fail,
@@ -43,6 +44,7 @@ export function makeHangingRedis(): FakeRedis {
   return {
     ...makeFakeRedis(),
     get: hang,
+    getEx: hang,
     set: hang,
     del: hang,
     incr: hang,
@@ -66,6 +68,15 @@ export function makeFakeRedis(seed: Record<string, string> = {}): FakeRedis {
     expireCalls,
     async get(key) {
       return store.get(key)?.value ?? null;
+    },
+    // Real GETEX leaves a missing key alone and records no expiry, which is how
+    // a test tells "slid the TTL on a hit" from "slid it on a miss too".
+    async getEx(key, options) {
+      const record = store.get(key);
+      if (!record) return null;
+      expireCalls.push({ key, seconds: options.value });
+      record.ex = options.value;
+      return record.value;
     },
     // Redis creates a missing key at 0 before incrementing, and the reply is the
     // new value — that "1 means first in the window" is what the limiter's TTL

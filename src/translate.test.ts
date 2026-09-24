@@ -138,7 +138,7 @@ describe("translateWithCache", () => {
 
   it("degrades to uncached when Redis fails, and logs it", async () => {
     const redis = makeFakeRedis();
-    redis.get = async () => {
+    redis.getEx = async () => {
       throw new Error("ECONNREFUSED");
     };
     redis.set = async () => {
@@ -166,4 +166,22 @@ describe("translateWithCache", () => {
     ).rejects.toMatchObject({ kind: "timeout" });
     expect(ctx.redis.store.size).toBe(0);
   });
+
+  it("renews a translation's expiry each time it is reused", async () => {
+    const ctx = makeContext({ ttlSeconds: 42 });
+
+    await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en" });
+    const key = translationKey(HOLA, "auto", "en");
+    // Age the entry, as most of a day unused would.
+    const record = ctx.redis.store.get(key);
+    if (record) record.ex = 1;
+
+    const second = await translateWithCache(ctx, { sourceId: OTHER_ID, text: "hola", target: "en" });
+
+    // A phrase the guild keeps reposting never runs down its clock; one nobody
+    // says again is the only kind that expires.
+    expect(second.cached).toBe(true);
+    expect(ctx.redis.store.get(key)?.ex).toBe(42);
+  });
+
 });

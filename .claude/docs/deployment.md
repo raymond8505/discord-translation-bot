@@ -109,7 +109,8 @@ write `.env`, `docker compose up -d --build --remove-orphans`, poll
 
 Secrets: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `GUILD_ID`, `GH_DEPLOY_KEY`, `VPS_HOST`,
 `VPS_USER`, `VPS_SSH_KEY`, `VPS_DEPLOY_PATH`. Service URLs, `BACKEND` and `CACHE_TTL_SECONDS` are
-literals in the heredoc; change production config by editing them there.
+literals in the heredoc; change production config by editing them there. `CACHE_TTL_SECONDS` is
+`86400` (one day) and slides on every cache read — see [translation.md](translation.md).
 
 Each required secret is asserted with `: "${VAR:?...}"` before anything is written. A missing
 repository secret arrives as an **empty string**, not as an unset variable, so without the guard it

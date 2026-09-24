@@ -167,7 +167,8 @@ jobs:
               echo "REDIS_PASSWORD=${REDIS_PASSWORD}"
               echo "LT_URL=http://libretranslate:5000"
               echo "BACKEND=libretranslate"
-              echo "CACHE_TTL_SECONDS=2592000"
+              # Slides on every read: repeated phrases persist, one-offs age out.
+              echo "CACHE_TTL_SECONDS=86400"
               # Abuse ceilings, not throttles: a fast-moving thread has one
               # person translating several messages in a row, well under 20/min.
               echo "RATE_LIMIT_USER_PER_MIN=20"

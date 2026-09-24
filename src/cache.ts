@@ -15,6 +15,8 @@ export interface CacheEntry {
  */
 export interface RedisLike {
   get(key: string): Promise<string | null>;
+  /** GET plus a new expiry in one round trip (Redis >= 6.2; the stack runs 7.4). */
+  getEx(key: string, options: { type: "EX"; value: number }): Promise<string | null>;
   set(key: string, value: string, options: { EX: number }): Promise<unknown>;
   del(keys: string[]): Promise<number>;
 }
@@ -25,6 +27,12 @@ export interface RedisLike {
  * messages is one entry, and the backend sees it once. The stored source text
  * is keyed by the message it came from, because edit-follow and the
  * re-translate menu ask where something was said, not what.
+ *
+ * Translations expire on a **sliding** TTL: every read puts the full TTL back.
+ * A phrase a guild keeps reposting is therefore kept indefinitely while it
+ * stays in use, and a one-off is gone within one TTL of the day it was said.
+ * That keeps the keyspace roughly the size of what the guild actually repeats
+ * rather than everything it has ever translated.
  */
 export interface TranslationCache {
   get(hash: string, source: string, target: string): Promise<CacheEntry | null>;
@@ -63,9 +71,13 @@ export function createCache(
   logger: Logger = log,
 ): TranslationCache {
   return {
+    // GETEX rather than GET + EXPIRE: one round trip, and no second failure
+    // mode that could discard a hit the cache already has in hand. A corrupt
+    // value has its expiry pushed out too, which is harmless — the caller
+    // treats it as a miss and overwrites it a moment later.
     async get(hash, source, target) {
       const key = translationKey(hash, source, target);
-      const raw = await redis.get(key);
+      const raw = await redis.getEx(key, { type: "EX", value: ttlSeconds });
       if (raw === null) return null;
       try {
         const parsed: unknown = JSON.parse(raw);

@@ -16,7 +16,7 @@ image.
 | `env.fixture.ts` | `validEnvSource` / `makeEnvSource()` (raw strings), `validEnv` / `makeEnv()` (parsed) |
 | `languages.fixture.ts` | `libreLanguageCodes` (realistic `/languages` set incl. `zt`/`nb`/`pb`, no `hr`/`lt`), `primaryOnlyCodes`, `makeSupported()` |
 | `libretranslate.fixture.ts` | response payloads, `makeJsonResponse()`, `makeFetch()` (records calls), `makeHangingFetch()` (drives the real timeout path) |
-| `redis.fixture.ts` | `makeFakeRedis()` — in-memory `RedisLike` + `RateLimitRedis`; `del([])` throws; `incr` returns the new value so "1 means first in the window" holds; `expireCalls` records TTLs. `makeFailingRedis()` rejects every command, `makeHangingRedis()` never settles |
+| `redis.fixture.ts` | `makeFakeRedis()` — in-memory `RedisLike` + `RateLimitRedis`; `del([])` throws; `getEx` records into `expireCalls` and leaves a missing key alone, so a test can tell a slid TTL from one slid on a miss; `incr` returns the new value so "1 means first in the window" holds; `expireCalls` records TTLs. `makeFailingRedis()` rejects every command, `makeHangingRedis()` never settles |
 | `cache.fixture.ts` | `cacheEntry` / `makeCacheEntry()` |
 | `backend.fixture.ts` | `makeFakeBackend()` — records `translateCalls`, default echo translation `[target] text` |
 | `context.fixture.ts` | `makeContext()` — full `AppContext` over the fakes, `makeRecordingLogger()`, and `alwaysLimited(scope, retryAfter)` for a handler's over-limit branch (pass as `rateLimiter`) |

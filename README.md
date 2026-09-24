@@ -341,9 +341,16 @@ files: they come from Node's ICU data in the reader's language.
 
 ## Adjusting the cache TTL
 
-`CACHE_TTL_SECONDS` (default `2592000`, 30 days) applies to new writes. Set
-it in `.env` locally, or edit the literal in the `.env` heredoc of
-`deploy.yml` for production. It is validated as a positive integer at boot.
+`CACHE_TTL_SECONDS` (default `86400`, 1 day) applies to new writes. Set it in
+`.env` locally, or edit the literal in the `.env` heredoc of `deploy.yml` for
+production. It is validated as a positive integer at boot.
+
+The TTL **slides for translations**: every cache hit puts the full TTL back, so
+a phrase a guild keeps reposting stays cached for as long as it keeps being
+used, while something said once is gone the next day. The cache therefore
+settles at roughly the size of what your guild repeats rather than growing with
+everything it has ever translated. Raise the TTL if you would rather keep more;
+the trade is Redis memory and how long message text is retained.
 
 ## Security
 
@@ -357,11 +364,13 @@ intent in the developer portal, and the bot also requests `Guilds`,
 registered to the single `GUILD_ID`, not globally, so a leaked invite link
 cannot put the bot to work in a server you did not choose.
 
-**It stores message text in Redis for 30 days.** Both the translation and the
-original text are cached (`tr:…` and `src:…`) for `CACHE_TTL_SECONDS`, so the
-re-translate menus work without re-fetching, alongside a list of which of the
-bot's own posts translated which message (`post:…`), which is what lets an edit
-find them. That is a data-retention decision, and it is yours: lower it, and
+**It stores message text in Redis for a day by default.** Both the translation
+and the original text are cached (`tr:…` and `src:…`) for `CACHE_TTL_SECONDS`,
+and a translation's expiry is pushed back each time it is reused, so text that
+keeps being reposted is retained for as long as that continues. Keeping the
+original text is what makes the re-translate menus work without re-fetching,
+alongside a list of which of the bot's own posts translated which message
+(`post:…`), which is what lets an edit find them. That is a data-retention decision, and it is yours: lower it, and
 tell your members if that matters to them. Editing a message invalidates its
 entries and rewrites its translations; deleting it drops both the entries and
 the record of what was posted.

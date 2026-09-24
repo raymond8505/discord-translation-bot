@@ -91,4 +91,40 @@ describe("createCache", () => {
     await expect(cache.invalidate(MESSAGE_ID)).resolves.toBe(0);
     expect(redis.delCalls).toEqual([[sourceKey(MESSAGE_ID)]]);
   });
+
+  it("puts the full TTL back every time a translation is read", async () => {
+    const redis = makeFakeRedis();
+    const cache = createCache(redis, TTL);
+    await cache.set(HASH, "auto", "en", makeCacheEntry());
+    // Age it, as a day of sitting unused would.
+    const record = redis.store.get(translationKey(HASH, "auto", "en"));
+    if (record) record.ex = 5;
+
+    await expect(cache.get(HASH, "auto", "en")).resolves.toBeTruthy();
+
+    expect(redis.store.get(translationKey(HASH, "auto", "en"))?.ex).toBe(TTL);
+    expect(redis.expireCalls).toEqual([{ key: translationKey(HASH, "auto", "en"), seconds: TTL }]);
+  });
+
+  it("slides nothing on a miss, so an absent key is not created or kept alive", async () => {
+    const redis = makeFakeRedis();
+
+    await expect(createCache(redis, TTL).get(HASH, "auto", "en")).resolves.toBeNull();
+
+    expect(redis.store.size).toBe(0);
+    expect(redis.expireCalls).toEqual([]);
+  });
+
+  it("does not slide the stored source text, which its own writes refresh", async () => {
+    const redis = makeFakeRedis();
+    const cache = createCache(redis, TTL);
+    await cache.setSource(MESSAGE_ID, "hola");
+
+    await expect(cache.getSource(MESSAGE_ID)).resolves.toBe("hola");
+
+    // `translateWithCache` re-writes it on every hit and miss alike, so reading
+    // it is not what should keep a message's text alive.
+    expect(redis.expireCalls).toEqual([]);
+  });
+
 });

@@ -76,7 +76,7 @@ Full English sentences score 100, so 25 still leaves real doubt flagged. A failu
 
 ## Cache
 
-`src/cache.ts` over a structural `RedisLike` (get / set with `EX` / del).
+`src/cache.ts` over a structural `RedisLike` (get / `getEx` / set with `EX` / del).
 
 **Two keyings, on purpose.** A translation is keyed by *what was said*; the stored source text and
 the post registry by *where it was said*. A string reposted in ten messages is one entry and one
@@ -84,7 +84,7 @@ backend call, while edit-follow and the re-translate menu still have a per-messa
 
 | Key | Value | TTL |
 | --- | --- | --- |
-| `tr:{contentHash}:{source}:{target}` | JSON `{ text, backend, source_lang, created_at, confidence? }` | `CACHE_TTL_SECONDS` |
+| `tr:{contentHash}:{source}:{target}` | JSON `{ text, backend, source_lang, created_at, confidence? }` | `CACHE_TTL_SECONDS`, **sliding** |
 | `src:{sourceId}` | original text (for the re-translate menu, and to tell a real edit from an unfurl) | same |
 | `post:{sourceId}` | JSON `[{ channelId, messageId, target, source }]` — every translation the bot posted about that message (`src/posts.ts`) | same, re-set on each post |
 
@@ -111,6 +111,26 @@ still stores nothing.
 
 Keys written under the old `tr:{sourceId}:{target}` shape are unreachable and expire on their TTL.
 There is no migration.
+
+### The TTL slides
+
+`CACHE_TTL_SECONDS` defaults to **86400 (one day)**, and every *read* of a translation puts the full
+TTL back — `cache.get` is a `GETEX key EX ttl`, not a `GET`. A phrase a guild keeps reposting is
+therefore kept for as long as it stays in use, and a one-off is gone the next day, so the keyspace
+settles at the size of what a guild repeats rather than everything it has ever translated.
+
+`GETEX` (Redis ≥ 6.2; the stack runs 7.4) rather than `GET` + `EXPIRE`: one round trip, and no
+second failure mode that could throw away a hit already in hand. A corrupt value has its expiry
+pushed out too, which is harmless — the caller reads it as a miss and overwrites it a moment later.
+
+`src:` and `post:` do **not** slide on read, and do not need to: `translateWithCache` re-writes
+`src:` with a fresh `EX` on every hit *and* miss, and `posts.write` re-sets the whole registry on
+each post. Both are refreshed by use, just by writing rather than reading.
+
+**What the shorter TTL costs.** Edit-follow and the re-translate menu reach back through `src:` and
+`post:`, so a message edited more than a day after its last translation no longer has its posts
+rewritten, and its menu reports expiry. That is the trade for a small keyspace; raise
+`CACHE_TTL_SECONDS` if a guild edits old messages and cares.
 
 ## Invalidation and edit-follow
 
