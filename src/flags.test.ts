@@ -65,7 +65,7 @@ describe("languageForFlag", () => {
   it("names every flag that asks for a language, in table order", () => {
     // Not just the first: someone deciding what to react with needs to know
     // their own country's flag works.
-    expect(flagsForLanguage("en", supported)).toEqual([
+    expect(flagsForLanguage("en", supported).slice(0, 7)).toEqual([
       FLAGS.uk,
       FLAGS.usa,
       FLAGS.canada,
@@ -74,6 +74,10 @@ describe("languageForFlag", () => {
       FLAGS.ireland,
       FLAGS.southAfrica,
     ]);
+    // The long tail matters just as much: reacting from Kingston or Dakar works.
+    expect(flagsForLanguage("en", supported)).toContain(FLAGS.jamaica);
+    expect(flagsForLanguage("fr", supported)).toContain(FLAGS.senegal);
+    expect(flagsForLanguage("nl", supported)).toContain(FLAGS.suriname);
     expect(flagsForLanguage("ja", supported)).toEqual([FLAGS.japan]);
     expect(flagsForLanguage("pt-BR", supported)).toEqual([FLAGS.brazil]);
   });

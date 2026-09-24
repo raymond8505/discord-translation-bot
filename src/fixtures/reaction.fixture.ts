@@ -19,6 +19,9 @@ export const FLAGS = {
   newZealand: "\u{1F1F3}\u{1F1FF}", // 🇳🇿
   ireland: "\u{1F1EE}\u{1F1EA}", // 🇮🇪
   southAfrica: "\u{1F1FF}\u{1F1E6}", // 🇿🇦
+  jamaica: "\u{1F1EF}\u{1F1F2}", // 🇯🇲
+  senegal: "\u{1F1F8}\u{1F1F3}", // 🇸🇳
+  suriname: "\u{1F1F8}\u{1F1F7}", // 🇸🇷
   germany: "\u{1F1E9}\u{1F1EA}", // 🇩🇪
   brazil: "\u{1F1E7}\u{1F1F7}", // 🇧🇷
   taiwan: "\u{1F1F9}\u{1F1FC}", // 🇹🇼

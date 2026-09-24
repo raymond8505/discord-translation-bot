@@ -91,8 +91,8 @@ list can never name a language the backend did not load. All the flags and not j
 showing only 🇬🇧 for English reads as a statement that 🇺🇸 and 🇦🇺 do not work. Subdivision flags
 (England, Scotland, Wales) are left out — they are tag sequences many clients draw as a bare black
 flag, so listing one advertises a broken-looking glyph; they still resolve fine as reactions. The
-whole 29-language list renders to ~740 chars against the 4096 embed cap, and a typical
-`LT_LOAD_ONLY` install shows far fewer.
+whole 29-language list renders to ~1,070 chars against the 4096 embed cap — English alone carries
+39 flags, which wraps to about three lines — and a typical `LT_LOAD_ONLY` install shows far fewer.
 
 ## Rate limiting
 
