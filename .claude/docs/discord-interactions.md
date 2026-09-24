@@ -91,8 +91,14 @@ list can never name a language the backend did not load. All the flags and not j
 showing only 🇬🇧 for English reads as a statement that 🇺🇸 and 🇦🇺 do not work. Subdivision flags
 (England, Scotland, Wales) are left out — they are tag sequences many clients draw as a bare black
 flag, so listing one advertises a broken-looking glyph; they still resolve fine as reactions. The
-whole 29-language list renders to ~1,070 chars against the 4096 embed cap — English alone carries
-39 flags, which wraps to about three lines — and a typical `LT_LOAD_ONLY` install shows far fewer.
+list is a two-column table — language first, then its flags one space apart — inside a **code
+block**, which is the only way a column lines up: Discord renders no Markdown table in an embed, and
+its proportional body font turns padding into noise. Unicode emoji still draw as emoji in a code
+block; only `:shortcodes:` do not. Padding counts code points, so a non-Latin label can sit slightly
+proud (those glyphs are double-width in monospace and no number of spaces fixes it).
+
+The whole 29-language table renders to ~1,470 chars against the 4096 embed cap — English alone
+carries 39 flags, so that row wraps — and a typical `LT_LOAD_ONLY` install shows far fewer rows.
 
 ## Rate limiting
 

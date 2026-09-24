@@ -5,7 +5,13 @@ import { makeSupported } from "./fixtures/languages.fixture.js";
 import { frenchMessages, makeMessages } from "./fixtures/messages.fixture.js";
 import { createI18n } from "./i18n/index.js";
 import { menuLanguages } from "./locale.js";
-import { buildLanguagePickerReply, buildNoticeReply, buildTranslationReply, truncate } from "./reply.js";
+import {
+  buildLanguagePickerReply,
+  buildNoticeReply,
+  buildTranslationReply,
+  buildUnsupportedFlagReply,
+  truncate,
+} from "./reply.js";
 
 const ID = "123456789012345678";
 const supported = makeSupported();
@@ -186,5 +192,53 @@ describe("buildNoticeReply", () => {
     const reply = buildNoticeReply("Nothing to translate.");
     expect(reply.embeds[0]?.toJSON().description).toBe("Nothing to translate.");
     expect(reply.components).toEqual([]);
+  });
+});
+
+describe("buildUnsupportedFlagReply", () => {
+  const CAMBODIA = "\u{1F1F0}\u{1F1ED}";
+  const FLAG = /\p{Regional_Indicator}/u;
+
+  function unsupported(codes?: readonly string[]): string {
+    return (
+      buildUnsupportedFlagReply({
+        flag: CAMBODIA,
+        supported: codes === undefined ? supported : makeSupported(codes),
+        tr: i18n.forLocale("en-US"),
+      }).embeds[0]?.toJSON().description ?? ""
+    );
+  }
+
+  /** The rows between the fences, which is the table and not the sentences. */
+  function tableRows(text: string): string[] {
+    return text.split("```")[1]?.split("\n").filter((line) => line.trim() !== "") ?? [];
+  }
+
+  it("lays the languages out as a padded two-column code block", () => {
+    const text = unsupported();
+    const rows = tableRows(text);
+
+    expect(text).toContain("```");
+    expect(rows.length).toBeGreaterThan(5);
+    // Every flag column starts in the same place, which is the point of padding.
+    expect(new Set(rows.map((row) => row.search(FLAG))).size).toBe(1);
+    // Label first, then one space between flags.
+    expect(text).toMatch(/\nGreek {2,}\p{Regional_Indicator}{2} \p{Regional_Indicator}{2}\n/u);
+  });
+
+  it("puts the language first, which is what the reader is scanning for", () => {
+    const rows = tableRows(unsupported());
+
+    expect(rows.every((row) => /^[A-Z]/.test(row))).toBe(true);
+    expect(rows.some((row) => row.startsWith("English") && FLAG.test(row))).toBe(true);
+  });
+
+  it("never asks for the widest label of an empty set", () => {
+    // `Math.max()` of nothing is -Infinity, so the table must not be reached.
+    const text = unsupported([]);
+
+    expect(text).toContain(CAMBODIA);
+    expect(text).toMatch(/server admin/);
+    expect(text).not.toContain("```");
   });
 });
