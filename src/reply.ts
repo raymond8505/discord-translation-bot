@@ -140,10 +140,10 @@ export interface UnsupportedFlagInput {
  * and the same order as the menus everywhere else, and a language the backend
  * did not load cannot appear. Each is listed with *every* flag that asks for
  * it, because the reader wants to know whether their own country's flag works.
- * A language no flag names would keep its row with an empty second column —
- * still translatable, just not reachable by reacting. Nothing in `LANGUAGES`
- * is in that position today, so the `trimEnd` below guards whoever adds one
- * rather than a case the suite can reach.
+ * A language no flag names is listed with its label alone — still
+ * translatable, just not reachable by reacting. Nothing in `LANGUAGES` is in
+ * that position today, so the `trimEnd` below guards whoever adds one rather
+ * than a case the suite can reach.
  */
 export function buildUnsupportedFlagReply(input: UnsupportedFlagInput): ReplyPayload {
   const { flag, supported, tr } = input;
@@ -154,7 +154,7 @@ export function buildUnsupportedFlagReply(input: UnsupportedFlagInput): ReplyPay
 
   // Glue lives in code; only the sentences are translated.
   const parts = [tr.t("reaction.unsupportedFlag", { flag })];
-  if (rows.length > 0) parts.push(`${tr.t("reaction.supportedFlags")}\n\n${languageTable(rows)}`);
+  if (rows.length > 0) parts.push(`${tr.t("reaction.supportedFlags")}\n\n${languageList(rows)}`);
   parts.push(tr.t("reaction.askAdmin"));
 
   return buildNoticeReply(parts.join("\n\n"));
@@ -166,30 +166,18 @@ interface LanguageRow {
 }
 
 /**
- * Two columns, language first, inside a code block.
+ * One labelled entry per language: the name in bold, its flags on the line
+ * below, a blank line between entries.
  *
- * Language first because that is what the reader is looking for; forty flags
- * in front of the name is a wall to scan past. The code block is what makes
- * the second column line up at all: Discord renders no Markdown table inside
- * an embed, and its proportional body font turns padding into noise. Unicode
- * emoji still draw as emoji in one -- only `:shortcodes:` do not.
- *
- * Padding counts code points, so a label outside the Latin scripts can still
- * sit slightly proud: those glyphs are double-width in a monospace font and no
- * number of spaces fixes that. The column is right for the Latin labels, which
- * is what most of them are.
+ * The name leads because it is what the reader is looking for, and bold gives
+ * it a shape the eye can catch while scrolling — a flag row can run to forty
+ * emoji and wrap, so the label has to stand out from the wrapped line above
+ * it. Discord renders no Markdown table inside an embed, and the padded code
+ * block that was the alternative only ever lined up the Latin labels, so
+ * nothing is lost by giving the columns up.
  */
-function languageTable(rows: readonly LanguageRow[]): string {
-  const width = Math.max(...rows.map((row) => [...row.label].length));
-  const body = rows
-    .map((row) => `${pad(row.label, width)}  ${row.flags}`.trimEnd())
-    .join("\n");
-  return ["```", body, "```"].join("\n");
-}
-
-/** `padEnd` counts UTF-16 units; a label's visible length is its code points. */
-function pad(label: string, width: number): string {
-  return label + " ".repeat(Math.max(0, width - [...label].length));
+function languageList(rows: readonly LanguageRow[]): string {
+  return rows.map((row) => `**${row.label}**\n${row.flags}`.trimEnd()).join("\n\n");
 }
 
 export interface LanguagePickerInput {

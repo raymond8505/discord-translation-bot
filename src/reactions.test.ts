@@ -115,15 +115,13 @@ describe("handleFlagReaction", () => {
     expect(dm).toContain(FLAGS.cambodia);
     // Every flag that works, not just the first: someone deciding what to react
     // with needs to know their own country's flag is one of them.
-    const english = dm?.split("\n").find((line) => line.startsWith("English"));
+    const english = dm?.split("**English**\n")[1]?.split("\n")[0] ?? "";
     expect(english).toContain(
       [FLAGS.uk, FLAGS.usa, FLAGS.canada, FLAGS.australia, FLAGS.newZealand].join(" "),
     );
     expect(english).toContain(FLAGS.jamaica);
-    // Language first, flags second, in a code block so the column lines up.
-    const japanese = dm?.split("\n").find((line) => line.startsWith("Japanese"));
-    expect(japanese?.endsWith(FLAGS.japan)).toBe(true);
-    expect(dm).toContain("```");
+    // Label above, flags below.
+    expect(dm).toContain(`**Japanese**\n${FLAGS.japan}`);
     expect(dm).toMatch(/server admin/);
     // No menus: a pick made in a DM would post the translation into the DM.
     expect(user.dms[0]?.components).toEqual([]);

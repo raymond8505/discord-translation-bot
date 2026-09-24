@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseSelectCustomId } from "./components/customId.js";
 import { makeCacheEntry } from "./fixtures/cache.fixture.js";
+import { FLAGS } from "./fixtures/reaction.fixture.js";
 import { makeSupported } from "./fixtures/languages.fixture.js";
 import { frenchMessages, makeMessages } from "./fixtures/messages.fixture.js";
 import { createI18n } from "./i18n/index.js";
@@ -209,36 +210,31 @@ describe("buildUnsupportedFlagReply", () => {
     );
   }
 
-  /** The rows between the fences, which is the table and not the sentences. */
-  function tableRows(text: string): string[] {
-    return text.split("```")[1]?.split("\n").filter((line) => line.trim() !== "") ?? [];
-  }
-
-  it("lays the languages out as a padded two-column code block", () => {
+  it("labels each language in bold and puts its flags on the next line", () => {
     const text = unsupported();
-    const rows = tableRows(text);
 
-    expect(text).toContain("```");
-    expect(rows.length).toBeGreaterThan(5);
-    // Every flag column starts in the same place, which is the point of padding.
-    expect(new Set(rows.map((row) => row.search(FLAG))).size).toBe(1);
-    // Label first, then one space between flags.
-    expect(text).toMatch(/\nGreek {2,}\p{Regional_Indicator}{2} \p{Regional_Indicator}{2}\n/u);
+    expect(text).toContain("**English**\n");
+    // The label leads, and the flags are the whole of the line under it.
+    const english = text.split("**English**\n")[1]?.split("\n")[0] ?? "";
+    expect(english.startsWith(FLAGS.uk)).toBe(true);
+    expect(english).toContain(FLAGS.jamaica);
+    // One space between flags, and nothing else on the line.
+    expect(english).toMatch(/^\p{Regional_Indicator}{2}( \p{Regional_Indicator}{2})+$/u);
   });
 
-  it("puts the language first, which is what the reader is scanning for", () => {
-    const rows = tableRows(unsupported());
+  it("separates entries with a blank line so a wrapped flag row stays readable", () => {
+    const text = unsupported();
 
-    expect(rows.every((row) => /^[A-Z]/.test(row))).toBe(true);
-    expect(rows.some((row) => row.startsWith("English") && FLAG.test(row))).toBe(true);
+    expect(text).toContain("**Greek**\n");
+    expect(text).toMatch(/\n\n\*\*Greek\*\*\n\p{Regional_Indicator}{2} \p{Regional_Indicator}{2}\n\n/u);
   });
 
-  it("never asks for the widest label of an empty set", () => {
-    // `Math.max()` of nothing is -Infinity, so the table must not be reached.
+  it("lists nothing at all when the backend serves no language it knows", () => {
     const text = unsupported([]);
 
     expect(text).toContain(CAMBODIA);
     expect(text).toMatch(/server admin/);
-    expect(text).not.toContain("```");
+    expect(text).not.toContain("**");
+    expect(FLAG.test(text.replace(CAMBODIA, ""))).toBe(false);
   });
 });
