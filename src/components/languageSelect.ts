@@ -1,6 +1,7 @@
 import { MessageFlags } from "discord.js";
 import type { AppContext } from "../context.js";
 import { rateLimitMessageFor } from "../errors.js";
+import { publishTranslation, type PostedMessage } from "../publish.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { isMessageSourceId } from "../sourceId.js";
 import { AUTO_SOURCE, translateWithCache } from "../translate.js";
@@ -13,21 +14,23 @@ export interface LanguageSelectInteraction {
   readonly guildId: string | null;
   readonly customId: string;
   readonly values: readonly string[];
-  readonly message: { readonly flags: { has(flag: MessageFlags): boolean } };
+  /** `send` is absent on the one channel kind that cannot be posted to (a partial group DM). */
   readonly channel: {
     readonly messages: { fetch(id: string): Promise<{ readonly content: string }> };
+    send?(payload: ReplyPayload): Promise<PostedMessage>;
   } | null;
-  deferUpdate(): Promise<unknown>;
   deferReply(options: { flags: MessageFlags.Ephemeral }): Promise<unknown>;
   editReply(payload: ReplyPayload): Promise<unknown>;
 }
 
 /**
  * Re-translates after a menu pick. A source menu forces (or un-forces) the
- * source and keeps the target; a target menu keeps the source. A menu on an
- * ephemeral reply edits that reply in place; a menu on a public reply (the
- * mention trigger) answers the clicker with a fresh ephemeral message so the
- * public post stays as is.
+ * source and keeps the target; a target menu keeps the source.
+ *
+ * The new translation is posted to the channel, like every other translation:
+ * a pick is someone saying the room needs this in another language too. The
+ * post the menu sits on stays as it is — it is a translation someone else
+ * asked for, and it follows its own source message on its own.
  */
 export async function handleLanguageSelect(
   ctx: AppContext,
@@ -39,12 +42,7 @@ export async function handleLanguageSelect(
     return;
   }
 
-  const onEphemeral = interaction.message.flags.has(MessageFlags.Ephemeral);
-  if (onEphemeral) {
-    await interaction.deferUpdate();
-  } else {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  }
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const tr = ctx.i18n.forLocale(interaction.locale);
 
@@ -74,9 +72,28 @@ export async function handleLanguageSelect(
   const supported = await ctx.languages.get();
   const forced = source === AUTO_VALUE ? undefined : source;
   const outcome = await translateWithCache(ctx, { sourceId: parsed.sourceId, text, target, source: forced });
-  await interaction.editReply(
-    buildTranslationReply({ ...outcome, sourceId: parsed.sourceId, source: forced ?? AUTO_SOURCE, supported, tr }),
-  );
+  const reply = buildTranslationReply({
+    ...outcome,
+    sourceId: parsed.sourceId,
+    source: forced ?? AUTO_SOURCE,
+    supported,
+    tr,
+  });
+
+  // Unpostable channels get here only when `resolveSourceText` found the text in
+  // the cache, so the ephemeral reply is the last place left to put the result.
+  const send = interaction.channel?.send?.bind(interaction.channel);
+  if (!send) {
+    await interaction.editReply(reply);
+    return;
+  }
+  await publishTranslation(ctx, {
+    sourceId: parsed.sourceId,
+    target: outcome.target,
+    source: forced ?? AUTO_SOURCE,
+    post: () => send(reply),
+  });
+  await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
 }
 
 async function resolveSourceText(

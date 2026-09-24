@@ -2,14 +2,21 @@
 
 ## Entry points
 
-| Surface | Module | Visibility |
+| Surface | Module | Where the translation lands |
 | --- | --- | --- |
-| `/translate text: [target]` | `src/commands/translate.ts` | ephemeral |
-| "Translate Message" context menu | `src/commands/translateMessage.ts` | ephemeral |
-| `/tb-help` (supported languages and their codes) | `src/commands/help.ts` | ephemeral |
-| Reply + `@mention` (optional language hint) | `src/mentions.ts` (`MessageCreate`) | **public** |
-| Flag reaction (🇫🇷 on any message) | `src/reactions.ts` (`MessageReactionAdd`) | **public** |
-| Language select menus | `src/components/languageSelect.ts` | ephemeral (new message on a public reply; edit in place on an ephemeral one) |
+| `/translate text: [target]` | `src/commands/translate.ts` | **public** `channel.send` (ephemeral reply only when there is no channel to post to) |
+| "Translate Message" context menu | `src/commands/translateMessage.ts` | **public** reply to the target message |
+| Reply + `@mention` (optional language hint) | `src/mentions.ts` (`MessageCreate`) | **public** reply |
+| Flag reaction (🇫🇷 on any message) | `src/reactions.ts` (`MessageReactionAdd`) | **public** reply |
+| Language select menus | `src/components/languageSelect.ts` | **public** `channel.send`, a new post per pick |
+| `/tb-help` (supported languages and their codes) | `src/commands/help.ts` | ephemeral — not a translation |
+
+Every translation goes out through `publishTranslation()` (`src/publish.ts`), which posts it and
+records `{channelId, messageId, target, source}` under the source message's id so an edit can find
+it again — see [translation.md](translation.md). An interaction still defers and answers
+ephemerally, but that answer is the `reply.posted` acknowledgement or a refusal; the translation
+itself is a real message, because an ephemeral one is visible to one person and cannot be edited
+later. Free text (`/translate text:`) is recorded nowhere: a `t_<hex>` id has no message to follow.
 
 `src/interactions.ts` is the single `InteractionCreate` listener: it routes by the type guards
 (`isChatInputCommand`, `isMessageContextMenuCommand`, `isAutocomplete`, `isStringSelectMenu`) and
@@ -19,9 +26,9 @@ Add a new command by exporting its builder from `src/commands/`, appending it to
 
 ## Rules every handler follows
 
-- **Acknowledge within 3 seconds.** `deferReply({ flags: MessageFlags.Ephemeral })` (or
-  `deferUpdate()` on an ephemeral message's component) is the first statement. Autocomplete must
-  `respond()` within 3 s too, so it reads only `ctx.languages.peek()` and never awaits the backend.
+- **Acknowledge within 3 seconds.** `deferReply({ flags: MessageFlags.Ephemeral })` is the first
+  statement, on every interaction including a select. Autocomplete must `respond()` within 3 s too,
+  so it reads only `ctx.languages.peek()` and never awaits the backend.
 - **`flags: MessageFlags.Ephemeral`**, never `ephemeral: true` (deprecated in discord.js 14).
 - **Handlers declare a structural interface** of what they read (`TranslateInteraction`,
   `LanguageSelectInteraction`, `MentionMessage`, ...). TypeScript proves the real discord.js object
@@ -43,9 +50,12 @@ requests: the bot exists for fast-moving threads where one person translates sev
 row, and a fixed delay would punish exactly that. Cache hits count too — a request costs a Discord
 API call whether or not it reaches the backend.
 
-Five surfaces check it: `/translate`, the context menu, the mention trigger, the flag reaction, and
-**the select menus** — a menu pick re-translates, and menus on a public reply are clickable by
-anyone in the channel, which makes them the cheapest surface to hammer.
+Six surfaces check it: `/translate`, the context menu, the mention trigger, the flag reaction,
+**the select menus** — a menu pick re-translates and posts, and the menus are clickable by anyone in
+the channel, which makes them the cheapest surface to hammer — and **the edit refresh**
+(`src/invalidation.ts`), which checks once per post it is about to rewrite with `userId: null`: the
+work costs the backend, so the guild budget sees it, but nobody requested it, so no one person is
+charged. A refusal there stops the whole refresh and leaves the posts stale.
 
 **Where the check goes, and what a refusal looks like, differ by surface:**
 
@@ -102,6 +112,10 @@ reaction *removal* does nothing.
 
 ## Menus and the customId scheme
 
+A pick posts a **new** public translation rather than rewriting the one it was clicked on: that post
+is a translation someone else asked for, and it keeps following its own source message. The clicker
+gets the ephemeral `reply.posted` acknowledgement.
+
 Every translation reply carries up to four select rows: two **source** menus (Auto-detect first,
 then the languages, preselecting what was detected or forced) and two **target** menus (preselecting
 the current target). Two per role because the Discord-locale list (~29) exceeds the 25-option cap;
@@ -119,6 +133,7 @@ expiry. Never put text in a customId.
 `Guilds`, `GuildMessages`, `MessageContent` (privileged — enable in the developer portal),
 `GuildMessageReactions` (not privileged) and `Partials.Message`, `Partials.Reaction`,
 `Partials.User`, without which edits, deletes and reactions on messages sent before boot never
-arrive — cache invalidation misses them and a flag on older history does nothing. `oldMessage` in
-`messageUpdate` may be partial (`content: null`); a partial reaction and its partial message are
-fetched in `handleFlagReaction` before the text is read.
+arrive — a flag on older history does nothing, and an edit to it reaches neither the cache nor the
+posts that quote it. Either side of `messageUpdate` may be partial (`content: null`): the invalidator
+fetches a partial `newMessage` before reading the new text, and `handleFlagReaction` fetches a
+partial reaction and its partial message before reading theirs.

@@ -2,6 +2,7 @@ import type { AppContext } from "./context.js";
 import { isOperational, userMessageFor } from "./errors.js";
 import { isFlagEmoji, languageForFlag } from "./flags.js";
 import type { Translator } from "./i18n/index.js";
+import { publishTranslation, type PostedMessage } from "./publish.js";
 import {
   buildLanguagePickerReply,
   buildNoticeReply,
@@ -29,7 +30,7 @@ export interface ReactedMessage {
   readonly guild: { readonly preferredLocale: string } | null;
   readonly reactions: { readonly cache: ReadonlyMap<string, ReactionSummary> };
   fetch(): Promise<ReactedMessage>;
-  reply(options: ReplyPayload & { allowedMentions: { repliedUser: boolean } }): Promise<unknown>;
+  reply(options: ReplyPayload & { allowedMentions: { repliedUser: boolean } }): Promise<PostedMessage>;
 }
 
 export interface FlagReaction extends ReactionSummary {
@@ -130,10 +131,16 @@ async function translateForFlag(
   }
 
   const outcome = await translateWithCache(ctx, { sourceId, text, target });
-  await replyQuietly(
-    message,
-    buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
-  );
+  await publishTranslation(ctx, {
+    sourceId,
+    target: outcome.target,
+    source: AUTO_SOURCE,
+    post: () =>
+      replyQuietly(
+        message,
+        buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
+      ),
+  });
 }
 
 /**
@@ -161,6 +168,6 @@ function alreadyAsked(
 }
 
 /** Replies without pinging the author; they wrote the message, they didn't ask for this. */
-function replyQuietly(message: ReactedMessage, payload: ReplyPayload): Promise<unknown> {
+function replyQuietly(message: ReactedMessage, payload: ReplyPayload): Promise<PostedMessage> {
   return message.reply({ ...payload, allowedMentions: { repliedUser: false } });
 }

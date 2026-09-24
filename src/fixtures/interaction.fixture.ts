@@ -1,9 +1,10 @@
-import { MessageFlags } from "discord.js";
 import type { HelpInteraction } from "../commands/help.js";
 import type { TranslateAutocompleteInteraction, TranslateInteraction } from "../commands/translate.js";
 import type { TranslateMessageInteraction } from "../commands/translateMessage.js";
 import type { LanguageSelectInteraction } from "../components/languageSelect.js";
+import type { PostedMessage } from "../publish.js";
 import type { ReplyPayload } from "../reply.js";
+import { CHANNEL_ID, makePostedMessages } from "./post.fixture.js";
 
 /** Records every response call so tests can assert order and payloads. */
 export interface ResponseLog {
@@ -16,6 +17,26 @@ export const SPANISH_TEXT = "¿Hola, cómo estás?";
 export const USER_ID = "222222222222222222";
 export const GUILD_ID = "876543210987654321";
 
+/** `channel.send`: records the public post and answers as Discord would, with the sent message. */
+function makeSend(calls: ResponseLog["calls"]): (payload: ReplyPayload) => Promise<PostedMessage> {
+  const posted = makePostedMessages();
+  return async (payload) => {
+    calls.push({ method: "send", payload });
+    return posted();
+  };
+}
+
+/** `targetMessage.reply`: the context menu's public post, quiet like the other triggers. */
+function makeReply(
+  calls: ResponseLog["calls"],
+): (options: ReplyPayload & { allowedMentions: { repliedUser: boolean } }) => Promise<PostedMessage> {
+  const posted = makePostedMessages();
+  return async (payload) => {
+    calls.push({ method: "reply", payload });
+    return posted();
+  };
+}
+
 export interface ChatInputOptions {
   text?: string;
   target?: string | null;
@@ -24,6 +45,8 @@ export interface ChatInputOptions {
   userId?: string;
   /** `null` models a DM, where there is no guild budget to spend. */
   guildId?: string | null;
+  /** Models a channel the translation cannot be posted to, leaving only the ephemeral reply. */
+  withoutChannel?: boolean;
 }
 
 export function makeChatInputInteraction(
@@ -41,6 +64,7 @@ export function makeChatInputInteraction(
     user: { id: options.userId ?? USER_ID },
     guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     options: { getString: (name) => values[name] ?? null },
+    channel: options.withoutChannel ? null : { id: CHANNEL_ID, send: makeSend(calls) },
     async deferReply(payload) {
       calls.push({ method: "deferReply", payload });
     },
@@ -96,7 +120,11 @@ export function makeMessageContextInteraction(
     locale: options.locale ?? "fr",
     user: { id: options.userId ?? USER_ID },
     guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
-    targetMessage: { id: options.id ?? MESSAGE_ID, content: options.content ?? SPANISH_TEXT },
+    targetMessage: {
+      id: options.id ?? MESSAGE_ID,
+      content: options.content ?? SPANISH_TEXT,
+      reply: makeReply(calls),
+    },
     async deferReply(payload) {
       calls.push({ method: "deferReply", payload });
     },
@@ -109,8 +137,6 @@ export function makeMessageContextInteraction(
 export interface SelectOptions {
   customId: string;
   value?: string;
-  /** Whether the menu sits on an ephemeral reply (edit in place) or a public one. */
-  onEphemeral?: boolean;
   /** What `channel.messages.fetch` returns; `null` models a deleted message (fetch throws). */
   channelMessage?: { content: string } | null;
   /** `channel: null` models an interaction with no channel to fetch from. */
@@ -130,9 +156,6 @@ export function makeSelectInteraction(options: SelectOptions): LanguageSelectInt
     guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     customId: options.customId,
     values: options.value === undefined ? ["fr"] : [options.value],
-    message: {
-      flags: { has: (flag) => flag === MessageFlags.Ephemeral && (options.onEphemeral ?? true) },
-    },
     channel: options.withoutChannel
       ? null
       : {
@@ -143,10 +166,8 @@ export function makeSelectInteraction(options: SelectOptions): LanguageSelectInt
               return channelMessage;
             },
           },
+          send: makeSend(calls),
         },
-    async deferUpdate() {
-      calls.push({ method: "deferUpdate" });
-    },
     async deferReply(payload) {
       calls.push({ method: "deferReply", payload });
     },
@@ -166,4 +187,14 @@ export function lastReplyDescription(log: ResponseLog): string | undefined {
 export function lastReplyPayload(log: ResponseLog): ReplyPayload | undefined {
   const last = [...log.calls].reverse().find((c) => c.method === "editReply" || c.method === "reply");
   return last?.payload as ReplyPayload | undefined;
+}
+
+/** What actually landed in the channel: a `send`, or the `reply` the message triggers post. */
+export function lastPostPayload(log: ResponseLog): ReplyPayload | undefined {
+  const last = [...log.calls].reverse().find((c) => c.method === "send" || c.method === "reply");
+  return last?.payload as ReplyPayload | undefined;
+}
+
+export function lastPostDescription(log: ResponseLog): string | undefined {
+  return lastPostPayload(log)?.embeds[0]?.toJSON().description;
 }

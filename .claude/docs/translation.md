@@ -82,13 +82,33 @@ Full English sentences score 100, so 25 still leaves real doubt flagged. A failu
 | Key | Value | TTL |
 | --- | --- | --- |
 | `tr:{sourceId}:{target}` | JSON `{ text, backend, source_lang, created_at, confidence? }` | `CACHE_TTL_SECONDS` |
-| `src:{sourceId}` | original text (for the re-translate menu) | same |
+| `src:{sourceId}` | original text (for the re-translate menu, and to tell a real edit from an unfurl) | same |
+| `post:{sourceId}` | JSON `[{ channelId, messageId, target, source }]` — every translation the bot posted about that message (`src/posts.ts`) | same, re-set on each post |
 
 `translateWithCache()` (`src/translate.ts`) is cache-first; every cache call is wrapped so a Redis
 outage logs and degrades to uncached — it never fails a reply. Corrupt entries read as misses. A
 forced `source` skips the read and overwrites the entry.
 
-Invalidation (`src/invalidation.ts`): `messageUpdate` when the content actually changed (or the old
-message is partial) and `messageDelete` call `cache.invalidate(id)` = `SCAN MATCH tr:{id}:*` +
-`DEL` in batches, then `DEL src:{id}`. Never `KEYS`; never `DEL` with an empty list (the server
-rejects it — the fake throws to keep the guard honest).
+## Invalidation and edit-follow
+
+`src/invalidation.ts` handles `messageUpdate` and `messageDelete`. `cache.invalidate(id)` is
+`SCAN MATCH tr:{id}:*` + `DEL` in batches, then `DEL src:{id}`. Never `KEYS`; never `DEL` with an
+empty list (the server rejects it — the fake throws to keep the guard honest). `post:{id}` is
+deliberately **not** in that sweep: the registry has to survive the edit that triggers the refresh.
+A delete drops it explicitly, via `posts.drop(id)`.
+
+An edit then rewrites what is already in the channel, because a translation presented as a reading
+of a message that now says something else is worse than none:
+
+1. `shouldInvalidateOnUpdate()` — an edit that left the text alone (unfurl, pin) stops here. A
+   partial `oldMessage` has no content to compare, so it counts as changed.
+2. A partial `newMessage` is fetched; the new text is the whole point.
+3. **The new text is compared against `src:{id}`.** Equal means nothing really changed, and nothing
+   is touched. This is what keeps every unfurl on pre-boot history — which reaches step 2 with no
+   old content to rule it out — from costing a backend call per post.
+4. `cache.invalidate(id)`, then `posts.list(id)`. No posts, or no text left in the message, and the
+   refresh ends; the posts already in the channel stay as they are, there being no text to put in them.
+5. Per post: a guild-only rate-limit check, `translateWithCache()` for that post's own `target` and
+   `source` (a forced source stays forced), and `ctx.messages.edit()` (`src/messages.ts`, the only
+   Discord write outside a handler). `gone` — the post or channel is deleted, or access is lost —
+   prunes it with `posts.forget()`. One post failing never costs the others theirs.

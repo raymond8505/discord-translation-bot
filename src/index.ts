@@ -11,6 +11,8 @@ import { createMessageInvalidator } from "./invalidation.js";
 import { createSupportedLanguages } from "./languages.js";
 import { log } from "./log.js";
 import { handleMentionMessage } from "./mentions.js";
+import { createMessageEditor } from "./messages.js";
+import { createPostRegistry } from "./posts.js";
 import { handleFlagReaction } from "./reactions.js";
 import { createRateLimiter } from "./rateLimit.js";
 import { registerCommands } from "./registerCommands.js";
@@ -29,19 +31,9 @@ async function main(): Promise<void> {
   log.info("connected to redis");
 
   const backend = createBackend(env);
-  const ctx: AppContext = {
-    env,
-    backend,
-    cache: createCache(redis, env.CACHE_TTL_SECONDS),
-    languages: createSupportedLanguages(backend),
-    rateLimiter: createRateLimiter(redis, {
-      userPerMinute: env.RATE_LIMIT_USER_PER_MIN,
-      guildPerHour: env.RATE_LIMIT_GUILD_PER_HOUR,
-    }),
-    i18n: createI18n(),
-    log,
-  };
 
+  // Built before the context: editing the bot's own posts when a source message
+  // changes needs the client, so the client has to exist first.
   const client = new Client({
     // MessageContent is privileged: enable it in the developer portal or login rejects.
     // GuildMessageReactions (the flag trigger) is not, and needs no portal change.
@@ -55,6 +47,21 @@ async function main(): Promise<void> {
     // without these they are dropped, and cache invalidation and flags miss them.
     partials: [Partials.Message, Partials.Reaction, Partials.User],
   });
+
+  const ctx: AppContext = {
+    env,
+    backend,
+    cache: createCache(redis, env.CACHE_TTL_SECONDS),
+    posts: createPostRegistry(redis, env.CACHE_TTL_SECONDS),
+    messages: createMessageEditor(client),
+    languages: createSupportedLanguages(backend),
+    rateLimiter: createRateLimiter(redis, {
+      userPerMinute: env.RATE_LIMIT_USER_PER_MIN,
+      guildPerHour: env.RATE_LIMIT_GUILD_PER_HOUR,
+    }),
+    i18n: createI18n(),
+    log,
+  };
 
   const heartbeat = startHeartbeat(client);
   const invalidator = createMessageInvalidator(ctx);

@@ -8,6 +8,7 @@ import { rateLimitMessageFor } from "../errors.js";
 import { COMMAND_DESCRIPTION_MAX, localizationsFor } from "../i18n/discord.js";
 import { staticI18n, type Translator } from "../i18n/index.js";
 import { menuLanguages, parseLanguageHint, parseLanguageSpec, resolveTarget } from "../locale.js";
+import { publishTranslation, type PostedMessage } from "../publish.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForText } from "../sourceId.js";
 import { AUTO_SOURCE, MAX_INPUT_CHARS, translateWithCache } from "../translate.js";
@@ -58,6 +59,12 @@ export interface TranslateInteraction {
   readonly options: {
     getString(name: string, required?: boolean): string | null;
   };
+  /**
+   * Null in an uncached channel, and `send` is absent on the one channel kind
+   * discord.js has that cannot be posted to (a partial group DM); either way
+   * there is no room to put the translation in.
+   */
+  readonly channel: { readonly id: string; send?(payload: ReplyPayload): Promise<PostedMessage> } | null;
   deferReply(options: { flags: MessageFlags.Ephemeral }): Promise<unknown>;
   editReply(payload: ReplyPayload): Promise<unknown>;
 }
@@ -106,9 +113,29 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
   const target = spec.target ?? resolveTarget(interaction.locale, supported);
   const sourceId = sourceIdForText(text);
   const outcome = await translateWithCache(ctx, { sourceId, text, target, source: source ?? undefined });
-  await interaction.editReply(
-    buildTranslationReply({ ...outcome, sourceId, source: source ?? AUTO_SOURCE, supported, tr }),
-  );
+  const reply = buildTranslationReply({
+    ...outcome,
+    sourceId,
+    source: source ?? AUTO_SOURCE,
+    supported,
+    tr,
+  });
+
+  // The translation belongs in the channel, where the people it is for can read
+  // it. With nowhere to post it there is no audience beyond the invoker, so the
+  // ephemeral reply carries it instead.
+  const send = interaction.channel?.send?.bind(interaction.channel);
+  if (!send) {
+    await interaction.editReply(reply);
+    return;
+  }
+  await publishTranslation(ctx, {
+    sourceId,
+    target: outcome.target,
+    source: source ?? AUTO_SOURCE,
+    post: () => send(reply),
+  });
+  await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
 }
 
 export interface TranslateAutocompleteInteraction {

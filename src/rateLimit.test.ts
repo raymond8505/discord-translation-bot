@@ -119,6 +119,19 @@ describe("createRateLimiter", () => {
     expect([...redis.store.keys()].filter((k) => k.startsWith("rl:g:"))).toHaveLength(0);
   });
 
+  it("counts no user budget when nobody asked", async () => {
+    const { limiter, redis } = makeLimiter();
+
+    // A translation refreshed because its source was edited costs the backend,
+    // so the guild pays; billing it to whoever typed the edit would charge them
+    // for work they never requested.
+    const decision = await limiter.check({ userId: null, guildId: GUILD_ID });
+
+    expect(decision.allowed).toBe(true);
+    expect([...redis.store.keys()].filter((k) => k.startsWith("rl:u:"))).toHaveLength(0);
+    expect([...redis.store.keys()].filter((k) => k.startsWith("rl:g:"))).toHaveLength(1);
+  });
+
   it("keys each counter by window so old ones expire rather than accumulate", async () => {
     const { limiter, redis, clock } = makeLimiter();
     await limiter.check(ACTOR);

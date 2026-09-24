@@ -10,8 +10,8 @@ LibreTranslate (Argos models, entirely local, no third-party API).
 | --- | --- | --- |
 | React to a message with a country flag | 🇫🇷 🇩🇪 🇯🇵 … | Public reply with the translation and source/target menus |
 | Reply to a message and `@mention` the bot | `@bot`, `@bot french`, `@bot fr:en` | Public reply with the translation and source/target menus |
-| Right-click a message → Apps → **Translate Message** | context menu | Ephemeral (only you see it) |
-| `/translate text:<text> [target] [source]` | slash command, both language options autocomplete | Ephemeral |
+| Right-click a message → Apps → **Translate Message** | context menu | Public reply to that message; only you see the "posted it" note |
+| `/translate text:<text> [target] [source]` | slash command, both language options autocomplete | Public post in the channel; only you see the "posted it" note |
 | `/tb-help` | lists every supported language with the code `target:` and `@bot <code>` accept | Ephemeral |
 
 - Target language defaults to your Discord client language (slash / context
@@ -25,14 +25,22 @@ LibreTranslate (Argos models, entirely local, no third-party API).
   confidence. Below 25% the reply says so and how to force it: `@bot fr:en`
   (source:target), `@bot fr:` (source only), or `/translate` with `source:`.
   A forced source also replaces the cached translation for everyone.
-- Every reply carries **source and target menus** (two rows each): the
+- **Every translation is a real message in the channel.** They are for the
+  people who need them, not only for whoever asked, and a message is something
+  the bot can come back and correct. Refusals and "that message has no text"
+  stay private to you.
+- Every translation carries **source and target menus** (two rows each): the
   source menus show what was detected and let you correct it (or go back to
-  Auto-detect); the target menus re-translate into another language. On a
-  public reply a menu answers you privately; on an ephemeral reply it edits
-  in place.
+  Auto-detect); the target menus re-translate into another language. A pick
+  posts the new translation to the channel as well.
 - Any supported language to any other (Argos pivots through English
   internally). The language menus and autocomplete follow what LibreTranslate
   reports, re-checked every 5 minutes.
+- **Edit a message and its translations edit themselves.** The bot remembers
+  which of its posts translated which message, and rewrites every one of them
+  into the language it was posted in. Delete the message and its cache entries
+  and that record go; the posts stay, since deleting them would erase what was
+  said.
 - Translations are cached in Redis for 30 days per message and target; an
   edit or delete of the source message drops its cache entries.
 - The bot's own replies, menus and command descriptions follow your Discord
@@ -351,9 +359,12 @@ cannot put the bot to work in a server you did not choose.
 
 **It stores message text in Redis for 30 days.** Both the translation and the
 original text are cached (`tr:…` and `src:…`) for `CACHE_TTL_SECONDS`, so the
-re-translate menus work without re-fetching. That is a data-retention decision,
-and it is yours: lower it, and tell your members if that matters to them.
-Editing or deleting a message invalidates its entries.
+re-translate menus work without re-fetching, alongside a list of which of the
+bot's own posts translated which message (`post:…`), which is what lets an edit
+find them. That is a data-retention decision, and it is yours: lower it, and
+tell your members if that matters to them. Editing a message invalidates its
+entries and rewrites its translations; deleting it drops both the entries and
+the record of what was posted.
 
 **Redis and LibreTranslate are unauthenticated by default, and publish no
 ports.** They are reachable only on the compose network, which is enough when
@@ -373,10 +384,12 @@ removing them entirely means one member can saturate the box. Over the limit,
 slash commands answer privately and the public triggers (`@mention`, flag
 reaction) simply stay quiet.
 
-**Anyone in the channel can use the public replies.** A flag reaction or an
-`@mention` posts publicly, and the language menus on that post are clickable by
-anyone who can see it — by design, since the reply is public anyway. Each click
-answers only the person who clicked, and counts against *their* budget.
+**Every translation is public, and anyone in the channel can act on one.** That
+is the point of the bot — the room needs the translation, not just whoever asked
+— but it means a translation of a message is visible to everyone who can see the
+message, whichever trigger produced it. The language menus on a post are
+clickable by anyone who can see it, and a click posts another translation and
+counts against *that* person's budget.
 
 **The containers are confined.** All three drop every Linux capability, set
 `no-new-privileges`, and carry memory and pid limits; the bot additionally runs

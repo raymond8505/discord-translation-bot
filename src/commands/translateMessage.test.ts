@@ -5,6 +5,8 @@ import { alwaysLimited, makeContext } from "../fixtures/context.fixture.js";
 import {
   MESSAGE_ID,
   SPANISH_TEXT,
+  lastPostDescription,
+  lastPostPayload,
   lastReplyDescription,
   makeMessageContextInteraction,
 } from "../fixtures/interaction.fixture.js";
@@ -18,7 +20,7 @@ describe("translateMessageCommand", () => {
 });
 
 describe("handleTranslateMessage", () => {
-  it("defers ephemerally and translates the target message into the user's locale", async () => {
+  it("defers ephemerally and posts the translation as a reply to the message", async () => {
     const ctx = makeContext();
     const interaction = makeMessageContextInteraction({ locale: "fr" });
 
@@ -26,7 +28,19 @@ describe("handleTranslateMessage", () => {
 
     expect(interaction.calls[0]).toEqual({ method: "deferReply", payload: { flags: MessageFlags.Ephemeral } });
     expect(ctx.backend.translateCalls).toEqual([{ text: SPANISH_TEXT, source: "auto", target: "fr" }]);
-    expect(lastReplyDescription(interaction)).toBe(`[fr] ${SPANISH_TEXT}`);
+    expect(lastPostDescription(interaction)).toBe(`[fr] ${SPANISH_TEXT}`);
+    // The author wrote the message; they did not ask to be pinged about it.
+    expect(lastPostPayload(interaction)).toMatchObject({ allowedMentions: { repliedUser: false } });
+  });
+
+  it("tells only the invoker that it posted, and records where", async () => {
+    const ctx = makeContext();
+    const interaction = makeMessageContextInteraction({ id: MESSAGE_ID, locale: "fr" });
+
+    await handleTranslateMessage(ctx, interaction);
+
+    expect(lastReplyDescription(interaction)).toBe(frenchMessages["reply.posted"]);
+    await expect(ctx.posts.list(MESSAGE_ID)).resolves.toMatchObject([{ target: "fr", source: "auto" }]);
   });
 
   it("caches under the message id so edits and deletes can invalidate it", async () => {

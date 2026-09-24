@@ -3,9 +3,11 @@ import type { AppContext } from "../context.js";
 import { createI18n } from "../i18n/index.js";
 import { createSupportedLanguages } from "../languages.js";
 import type { Logger } from "../log.js";
+import { createPostRegistry } from "../posts.js";
 import { createRateLimiter, type RateLimiter, type RateLimitScope } from "../rateLimit.js";
 import { makeFakeBackend, type FakeBackend } from "./backend.fixture.js";
 import { makeEnv } from "./env.fixture.js";
+import { makeFakeMessageEditor, type FakeMessageEditor } from "./messageEditor.fixture.js";
 import { makeMessages } from "./messages.fixture.js";
 import { makeFakeRedis, type FakeRedis } from "./redis.fixture.js";
 
@@ -27,6 +29,7 @@ export function makeRecordingLogger(): RecordingLogger {
 export interface TestContext extends AppContext {
   readonly backend: FakeBackend;
   readonly redis: FakeRedis;
+  readonly messages: FakeMessageEditor;
   readonly log: RecordingLogger;
 }
 
@@ -40,6 +43,8 @@ export interface TestContextOptions {
    * `alwaysLimited()` is the usual argument.
    */
   rateLimiter?: RateLimiter;
+  /** Swapped in whole for the edit-follow paths that need a post to be gone or to fail. */
+  messages?: FakeMessageEditor;
 }
 
 /** A limiter that refuses everything, for exercising a handler's over-limit branch. */
@@ -61,6 +66,8 @@ export function makeContext(options: TestContextOptions = {}): TestContext {
     redis,
     log,
     cache: createCache(redis, env.CACHE_TTL_SECONDS, log),
+    posts: createPostRegistry(redis, env.CACHE_TTL_SECONDS, log),
+    messages: options.messages ?? makeFakeMessageEditor(),
     languages: createSupportedLanguages(backend, log),
     rateLimiter:
       options.rateLimiter ??

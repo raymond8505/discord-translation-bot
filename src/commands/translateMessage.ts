@@ -4,6 +4,7 @@ import { rateLimitMessageFor } from "../errors.js";
 import { COMMAND_NAME_MAX, localizationsFor } from "../i18n/discord.js";
 import { staticI18n } from "../i18n/index.js";
 import { resolveTarget } from "../locale.js";
+import { publishTranslation, type PostedMessage } from "../publish.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForMessage } from "../sourceId.js";
 import { AUTO_SOURCE, translateWithCache } from "../translate.js";
@@ -21,11 +22,24 @@ export interface TranslateMessageInteraction {
   readonly locale: string;
   readonly user: { readonly id: string };
   readonly guildId: string | null;
-  readonly targetMessage: { readonly id: string; readonly content: string };
+  readonly targetMessage: {
+    readonly id: string;
+    readonly content: string;
+    reply(
+      options: ReplyPayload & { allowedMentions: { repliedUser: boolean } },
+    ): Promise<PostedMessage>;
+  };
   deferReply(options: { flags: MessageFlags.Ephemeral }): Promise<unknown>;
   editReply(payload: ReplyPayload): Promise<unknown>;
 }
 
+/**
+ * The translation goes to the channel as a reply to the message it translates —
+ * the whole room needs it, not the one person who right-clicked. The
+ * interaction's own reply stays ephemeral and only acknowledges: refusals and
+ * "no text here" are for the invoker alone, and an interaction reply is not a
+ * durable message the edit-follow could come back to anyway.
+ */
 export async function handleTranslateMessage(
   ctx: AppContext,
   interaction: TranslateMessageInteraction,
@@ -39,7 +53,8 @@ export async function handleTranslateMessage(
     return;
   }
 
-  const { id, content } = interaction.targetMessage;
+  const { targetMessage } = interaction;
+  const { id, content } = targetMessage;
   if (!content.trim()) {
     await interaction.editReply(buildNoticeReply(tr.t("translate.noText")));
     return;
@@ -49,5 +64,17 @@ export async function handleTranslateMessage(
   const target = resolveTarget(interaction.locale, supported);
   const sourceId = sourceIdForMessage(id);
   const outcome = await translateWithCache(ctx, { sourceId, text: content, target });
-  await interaction.editReply(buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }));
+  await publishTranslation(ctx, {
+    sourceId,
+    target: outcome.target,
+    source: AUTO_SOURCE,
+    // Quiet, like the other two message-driven triggers: the author wrote the
+    // message, they didn't ask for this.
+    post: () =>
+      targetMessage.reply({
+        ...buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
+        allowedMentions: { repliedUser: false },
+      }),
+  });
+  await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
 }

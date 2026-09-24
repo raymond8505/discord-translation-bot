@@ -2,7 +2,13 @@ import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { sourceKey } from "../cache.js";
 import { alwaysLimited, makeContext } from "../fixtures/context.fixture.js";
-import { MESSAGE_ID, lastReplyDescription, lastReplyPayload, makeSelectInteraction } from "../fixtures/interaction.fixture.js";
+import {
+  MESSAGE_ID,
+  lastPostDescription,
+  lastPostPayload,
+  lastReplyDescription,
+  makeSelectInteraction,
+} from "../fixtures/interaction.fixture.js";
 import { frenchMessages } from "../fixtures/messages.fixture.js";
 import { makeFakeRedis } from "../fixtures/redis.fixture.js";
 import { sourceIdForText } from "../sourceId.js";
@@ -17,25 +23,24 @@ function withSource(text: string) {
 }
 
 describe("handleLanguageSelect", () => {
-  it("edits an ephemeral reply in place when a target is picked", async () => {
+  it("posts the new translation to the channel and acknowledges the clicker privately", async () => {
     const ctx = makeContext({ redis: withSource("hola") });
-    const interaction = makeSelectInteraction({ customId: targetMenu, value: "de", onEphemeral: true });
-
-    await handleLanguageSelect(ctx, interaction);
-
-    expect(interaction.calls[0]).toEqual({ method: "deferUpdate" });
-    expect(lastReplyDescription(interaction)).toBe("[de] hola");
-    expect(ctx.backend.translateCalls).toEqual([{ text: "hola", source: "auto", target: "de" }]);
-  });
-
-  it("answers a menu on a public reply with a fresh ephemeral message", async () => {
-    const ctx = makeContext({ redis: withSource("hola") });
-    const interaction = makeSelectInteraction({ customId: targetMenu, value: "de", onEphemeral: false });
+    const interaction = makeSelectInteraction({ customId: targetMenu, value: "de" });
 
     await handleLanguageSelect(ctx, interaction);
 
     expect(interaction.calls[0]).toEqual({ method: "deferReply", payload: { flags: MessageFlags.Ephemeral } });
-    expect(lastReplyDescription(interaction)).toBe("[de] hola");
+    expect(lastPostDescription(interaction)).toBe("[de] hola");
+    expect(lastReplyDescription(interaction)).toBe("Posted the translation in the channel.");
+    expect(ctx.backend.translateCalls).toEqual([{ text: "hola", source: "auto", target: "de" }]);
+  });
+
+  it("records the post so an edit to the message reaches it too", async () => {
+    const ctx = makeContext({ redis: withSource("hola") });
+
+    await handleLanguageSelect(ctx, makeSelectInteraction({ customId: targetMenu, value: "de" }));
+
+    await expect(ctx.posts.list(MESSAGE_ID)).resolves.toMatchObject([{ target: "de", source: "auto" }]);
   });
 
   it("forces the source from a source menu and keeps the target", async () => {
@@ -46,7 +51,7 @@ describe("handleLanguageSelect", () => {
 
     expect(ctx.backend.translateCalls).toEqual([{ text: "j'adore", source: "fr", target: "en" }]);
     // The new reply's target menus now carry the forced source.
-    const ids = lastReplyPayload(interaction)?.components.map((row) => parseSelectCustomId(row.toJSON().components[0]?.custom_id ?? ""));
+    const ids = lastPostPayload(interaction)?.components.map((row) => parseSelectCustomId(row.toJSON().components[0]?.custom_id ?? ""));
     expect(ids?.filter((id) => id?.role === "target").every((id) => id?.other === "fr")).toBe(true);
   });
 
@@ -75,7 +80,7 @@ describe("handleLanguageSelect", () => {
     await handleLanguageSelect(ctx, interaction);
 
     expect(interaction.calls.some((c) => c.method === "fetch" && c.payload === MESSAGE_ID)).toBe(true);
-    expect(lastReplyDescription(interaction)).toBe("[fr] buenos días");
+    expect(lastPostDescription(interaction)).toBe("[fr] buenos días");
   });
 
   it("reports expiry when the source is gone and cannot be re-fetched", async () => {
@@ -118,7 +123,7 @@ describe("handleLanguageSelect", () => {
 
     await handleLanguageSelect(ctx, interaction);
 
-    expect(lastReplyDescription(interaction)).toBe("[fr] hola");
+    expect(lastPostDescription(interaction)).toBe("[fr] hola");
   });
 
   it("ignores a customId it did not build", async () => {

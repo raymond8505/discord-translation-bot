@@ -21,7 +21,10 @@ image.
 | `backend.fixture.ts` | `makeFakeBackend()` — records `translateCalls`, default echo translation `[target] text` |
 | `context.fixture.ts` | `makeContext()` — full `AppContext` over the fakes, `makeRecordingLogger()`, and `alwaysLimited(scope, retryAfter)` for a handler's over-limit branch (pass as `rateLimiter`) |
 | `messages.fixture.ts` | `makeMessages()` — the real `en` plus a partial `fr` (`frenchMessages`), `zh-Hans` without `zh-Hant`, and `nb`; `makeContext()` builds its `i18n` from it so handler tests never depend on generated files |
-| `interaction.fixture.ts` | chat-input / autocomplete / context-menu / help / select fakes with a `calls` log, `lastReplyDescription()`; each takes the `locale` its handler reads, plus `userId`/`guildId` (`USER_ID`/`GUILD_ID` by default, `guildId: null` for a DM) |
+| `interaction.fixture.ts` | chat-input / autocomplete / context-menu / help / select fakes with a `calls` log; each takes the `locale` its handler reads, plus `userId`/`guildId` (`USER_ID`/`GUILD_ID` by default, `guildId: null` for a DM). `lastReplyDescription()` reads the ephemeral answer, `lastPostDescription()` / `lastPostPayload()` what landed in the channel (`send`, or the `reply` the message triggers post) |
+| `post.fixture.ts` | `CHANNEL_ID` / `POSTED_MESSAGE_ID`, `makePostRef()`, and `makePostedMessages()` — a fresh id per post, so a fixture driven twice records two distinct posts and the registry keeps both |
+| `messageEditor.fixture.ts` | `makeFakeMessageEditor()` — records every `edit`, and replays `gone` or a rejection for named message ids |
+| `invalidation.fixture.ts` | `makeEditedMessage()` — the `messageUpdate` payload, partial or full, with `fetchCalls` proving the partial path |
 | `message.fixture.ts` | `makeMentionMessage()` for the mention trigger |
 | `reaction.fixture.ts` | `makeFlagReaction()` (siblings seed `reactions.cache` for the duplicate rule; `fetchCalls` proves the partial path), `makeReactingUser()`, and the `FLAGS` / `NON_FLAGS` emoji written as escapes |
 

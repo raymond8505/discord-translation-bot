@@ -6,6 +6,7 @@ import type { Messages } from "../i18n/messages/index.js";
 export const frenchMessages = {
   "reply.title": "Traduction",
   "reply.source": "source : {language}",
+  "reply.posted": "J'ai publié la traduction dans le salon.",
   "menu.auto": "Détection automatique",
   "menu.to": "Traduire vers",
   "translate.nothing": "Rien à traduire.",

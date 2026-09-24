@@ -25,7 +25,13 @@ export const CHECK_TIMEOUT_MS = 1_000;
 
 /** Both ids come straight from Discord, so neither can carry a `:` into a key. */
 export interface RateLimitActor {
-  readonly userId: string;
+  /**
+   * Null when no person asked: a translation refreshed because its source
+   * message was edited costs the backend, so the guild budget sees it, but
+   * charging it to whoever typed the edit would bill them for work they did
+   * not request.
+   */
+  readonly userId: string | null;
   /** Null in a DM, where there is no guild budget to spend. */
   readonly guildId: string | null;
 }
@@ -117,9 +123,11 @@ export function createRateLimiter(
   }
 
   async function decide(actor: RateLimitActor): Promise<RateLimitDecision> {
-    const userKey = userWindowKey(actor.userId, windowIndex(USER_WINDOW_SECONDS));
-    if (!(await within(userKey, USER_WINDOW_SECONDS, limits.userPerMinute))) {
-      return { allowed: false, scope: "user", retryAfterSeconds: secondsLeftIn(USER_WINDOW_SECONDS) };
+    if (actor.userId !== null) {
+      const userKey = userWindowKey(actor.userId, windowIndex(USER_WINDOW_SECONDS));
+      if (!(await within(userKey, USER_WINDOW_SECONDS, limits.userPerMinute))) {
+        return { allowed: false, scope: "user", retryAfterSeconds: secondsLeftIn(USER_WINDOW_SECONDS) };
+      }
     }
 
     // Only reached when the user is inside their own budget, so one person

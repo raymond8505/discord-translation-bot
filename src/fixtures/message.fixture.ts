@@ -3,6 +3,7 @@ import type { MentionMessage } from "../mentions.js";
 import type { ReplyPayload } from "../reply.js";
 import type { ResponseLog } from "./interaction.fixture.js";
 import { GUILD_ID, MESSAGE_ID, SPANISH_TEXT, USER_ID } from "./interaction.fixture.js";
+import { makePostedMessages } from "./post.fixture.js";
 
 export const BOT_USER_ID = "999999999999999999";
 
@@ -32,6 +33,7 @@ export interface FakeMentionMessage extends MentionMessage, ResponseLog {
 export function makeMentionMessage(options: MentionMessageOptions = {}): FakeMentionMessage {
   const calls: ResponseLog["calls"] = [];
   const hasOptions: MessageMentionsHasOptions[] = [];
+  const posted = makePostedMessages();
   const parent = options.parent === undefined ? { id: MESSAGE_ID, content: SPANISH_TEXT } : options.parent;
   return {
     calls,
@@ -54,6 +56,7 @@ export function makeMentionMessage(options: MentionMessageOptions = {}): FakeMen
     },
     async reply(payload: ReplyPayload & { allowedMentions: { repliedUser: boolean } }) {
       calls.push({ method: "reply", payload });
+      return posted();
     },
   };
 }

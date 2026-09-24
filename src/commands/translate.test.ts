@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import { translationKey } from "../cache.js";
 import { alwaysLimited, makeContext } from "../fixtures/context.fixture.js";
 import {
+  lastPostDescription,
+  lastPostPayload,
   lastReplyDescription,
-  lastReplyPayload,
   makeAutocompleteInteraction,
   makeChatInputInteraction,
 } from "../fixtures/interaction.fixture.js";
@@ -32,17 +33,37 @@ describe("translateCommand", () => {
 });
 
 describe("handleTranslate", () => {
-  it("defers ephemerally before doing any work, then replies with the translation", async () => {
+  it("defers ephemerally before doing any work, then posts the translation to the channel", async () => {
     const ctx = makeContext();
     const interaction = makeChatInputInteraction({ text: "hola", locale: "en-GB" });
 
     await handleTranslate(ctx, interaction);
 
     expect(interaction.calls[0]).toEqual({ method: "deferReply", payload: { flags: MessageFlags.Ephemeral } });
-    expect(lastReplyDescription(interaction)).toBe("[en] hola");
+    expect(lastPostDescription(interaction)).toBe("[en] hola");
+    expect(lastReplyDescription(interaction)).toBe("Posted the translation in the channel.");
     expect(ctx.backend.translateCalls).toEqual([{ text: "hola", source: "auto", target: "en" }]);
     expect(ctx.redis.store.has(translationKey(sourceIdForText("hola"), "en"))).toBe(true);
-    expect(lastReplyPayload(interaction)?.components.length).toBeGreaterThan(0);
+    expect(lastPostPayload(interaction)?.components.length).toBeGreaterThan(0);
+  });
+
+  it("keeps the translation in the ephemeral reply when there is no channel to post to", async () => {
+    const ctx = makeContext();
+    const interaction = makeChatInputInteraction({ text: "hola", withoutChannel: true });
+
+    await handleTranslate(ctx, interaction);
+
+    expect(lastReplyDescription(interaction)).toBe("[en] hola");
+    expect(interaction.calls.some((call) => call.method === "send")).toBe(false);
+  });
+
+  it("records nothing for free text, which has no message an edit could change", async () => {
+    const ctx = makeContext();
+
+    await handleTranslate(ctx, makeChatInputInteraction({ text: "hola" }));
+
+    const recorded = [...ctx.redis.store.keys()].filter((key) => key.startsWith("post:"));
+    expect(recorded).toEqual([]);
   });
 
   it("honours an explicit target given as a code or a name", async () => {
@@ -110,7 +131,7 @@ describe("handleTranslate", () => {
     const named = makeChatInputInteraction({ text: "hola", target: "allemand", locale: "fr" });
     await handleTranslate(ctx, named);
     expect(ctx.backend.translateCalls.map((c) => c.target)).toEqual(["de"]);
-    expect(lastReplyPayload(named)?.embeds[0]?.toJSON().title).toBe(`${frenchMessages["reply.title"]} → Allemand`);
+    expect(lastPostPayload(named)?.embeds[0]?.toJSON().title).toBe(`${frenchMessages["reply.title"]} → Allemand`);
   });
 });
 

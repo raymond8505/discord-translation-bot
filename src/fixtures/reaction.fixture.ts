@@ -2,6 +2,7 @@ import type { FlagReaction, ReactedMessage, ReactingUser, ReactionSummary } from
 import type { ReplyPayload } from "../reply.js";
 import { GUILD_ID, MESSAGE_ID, SPANISH_TEXT, USER_ID, type ResponseLog } from "./interaction.fixture.js";
 import { BOT_USER_ID } from "./message.fixture.js";
+import { makePostedMessages } from "./post.fixture.js";
 
 /**
  * Emoji as escapes: the flags are pairs of regional indicators and the
@@ -77,6 +78,7 @@ export function makeFlagReaction(options: FlagReactionOptions = {}): FakeFlagRea
     cache.set(name, { emoji: { name }, count: siblingCount });
   }
 
+  const posted = makePostedMessages();
   const message: FakeReactedMessage = {
     calls,
     id: MESSAGE_ID,
@@ -94,6 +96,7 @@ export function makeFlagReaction(options: FlagReactionOptions = {}): FakeFlagRea
     },
     async reply(payload: ReplyPayload & { allowedMentions: { repliedUser: boolean } }) {
       calls.push({ method: "reply", payload });
+      return posted();
     },
   };
 

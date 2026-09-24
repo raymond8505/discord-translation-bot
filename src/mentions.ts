@@ -3,6 +3,7 @@ import type { AppContext } from "./context.js";
 import { isOperational, userMessageFor } from "./errors.js";
 import type { Translator } from "./i18n/index.js";
 import { parseLanguageSpec, resolveTarget } from "./locale.js";
+import { publishTranslation, type PostedMessage } from "./publish.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "./reply.js";
 import { sourceIdForMessage } from "./sourceId.js";
 import { AUTO_SOURCE, translateWithCache } from "./translate.js";
@@ -17,7 +18,7 @@ export interface MentionMessage {
   readonly reference: { readonly messageId: string | undefined } | null;
   readonly mentions: { has(userId: string, options?: MessageMentionsHasOptions): boolean };
   fetchReference(): Promise<{ readonly id: string; readonly content: string }>;
-  reply(options: ReplyPayload & { allowedMentions: { repliedUser: boolean } }): Promise<unknown>;
+  reply(options: ReplyPayload & { allowedMentions: { repliedUser: boolean } }): Promise<PostedMessage>;
 }
 
 /**
@@ -102,13 +103,19 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
     target,
     source: spec.source ?? undefined,
   });
-  await replyQuietly(
-    message,
-    buildTranslationReply({ ...outcome, sourceId, source: spec.source ?? AUTO_SOURCE, supported, tr }),
-  );
+  const source = spec.source ?? AUTO_SOURCE;
+  // Recorded against the message that was *translated*, not the mention that
+  // asked: an edit to the parent is what this post has to follow.
+  await publishTranslation(ctx, {
+    sourceId,
+    target: outcome.target,
+    source,
+    post: () =>
+      replyQuietly(message, buildTranslationReply({ ...outcome, sourceId, source, supported, tr })),
+  });
 }
 
 /** Replies without pinging the author again; they just posted and are watching. */
-function replyQuietly(message: MentionMessage, payload: ReplyPayload): Promise<unknown> {
+function replyQuietly(message: MentionMessage, payload: ReplyPayload): Promise<PostedMessage> {
   return message.reply({ ...payload, allowedMentions: { repliedUser: false } });
 }

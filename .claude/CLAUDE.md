@@ -22,7 +22,9 @@ in a test file.
 arrays. `tsconfig.build.json` excludes them from the image.
 
 **Every Discord interaction defers within 3 s and replies with `flags: MessageFlags.Ephemeral`**
-(the `ephemeral: true` option is deprecated). Public replies exist only on the mention trigger.
+(the `ephemeral: true` option is deprecated). What an interaction says ephemerally is an
+acknowledgement or a refusal; **every translation is a public channel message**, posted and recorded
+through `publishTranslation()` so an edit to the source can come back and rewrite it.
 
 **Redis: `SCAN`, never `KEYS`; guard empty `DEL`s** — the fake in `redis.fixture.ts` enforces both.
 

@@ -21,6 +21,15 @@ describe("handleMentionMessage", () => {
     expect(message.hasOptions[0]).toEqual({ ignoreEveryone: true, ignoreRoles: true, ignoreRepliedUser: true });
   });
 
+  it("records the post against the message it translated, not the mention", async () => {
+    const ctx = makeContext();
+
+    await handleMentionMessage(ctx, makeMentionMessage({ preferredLocale: "de" }));
+
+    // An edit to the parent is what this post has to follow.
+    await expect(ctx.posts.list(MESSAGE_ID)).resolves.toMatchObject([{ target: "de", source: "auto" }]);
+  });
+
   it("reads a language hint from the tagging message", async () => {
     const ctx = makeContext();
 

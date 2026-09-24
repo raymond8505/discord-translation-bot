@@ -26,6 +26,14 @@ describe("handleFlagReaction", () => {
     expect(lastReplyPayload(reaction)?.components.length).toBeGreaterThan(0);
   });
 
+  it("records the post so an edit to the message reaches it", async () => {
+    const ctx = makeContext();
+
+    await handleFlagReaction(ctx, makeFlagReaction({ emoji: FLAGS.germany }), makeReactingUser());
+
+    await expect(ctx.posts.list(MESSAGE_ID)).resolves.toMatchObject([{ target: "de", source: "auto" }]);
+  });
+
   it("reads the region behind the flag, not the country", async () => {
     const ctx = makeContext();
     const canadian = makeFlagReaction({ emoji: FLAGS.canada });
