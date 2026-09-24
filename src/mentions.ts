@@ -1,5 +1,6 @@
 import type { MessageMentionsHasOptions } from "discord.js";
 import type { AppContext } from "./context.js";
+import { sendDirect, type DirectRecipient } from "./dm.js";
 import { isOperational, userMessageFor } from "./errors.js";
 import type { Translator } from "./i18n/index.js";
 import { parseLanguageSpec, resolveTarget } from "./locale.js";
@@ -11,7 +12,7 @@ import { AUTO_SOURCE, translateWithCache } from "./translate.js";
 /** The slice of `Message` the mention trigger touches. */
 export interface MentionMessage {
   readonly content: string;
-  readonly author: { readonly bot: boolean; readonly id: string };
+  readonly author: DirectRecipient & { readonly bot: boolean };
   readonly client: { readonly user: { readonly id: string } | null };
   readonly guildId: string | null;
   readonly guild: { readonly preferredLocale: string } | null;
@@ -35,10 +36,15 @@ const USER_MENTION = /<@!?\d+>/g;
 
 /**
  * The reply-and-mention trigger: `@bot [language]` posted as a reply
- * translates the replied-to message for everyone in the channel. Public by
- * necessity (only interactions can be ephemeral); the menus on the reply
- * answer each clicker privately. A message carries no user locale, so the
- * reply is worded in the guild's preferred language.
+ * translates the replied-to message for everyone in the channel.
+ *
+ * The translation is public; every refusal is a DM to whoever mentioned the
+ * bot. A message is not an interaction, so there is no ephemeral reply to
+ * give, and a refusal concerns one person — the channel asked for nothing and
+ * should not be told. A DM the user does not accept is dropped.
+ *
+ * A message carries no user locale (only interactions have one), so even the
+ * DM is worded in the guild's preferred language.
  */
 export async function handleMentionMessage(ctx: AppContext, message: MentionMessage): Promise<void> {
   if (message.author.bot) return;
@@ -61,13 +67,13 @@ export async function handleMentionMessage(ctx: AppContext, message: MentionMess
   } catch (err) {
     if (isOperational(err)) ctx.log.warn("mention trigger: backend failure", err);
     else ctx.log.error("mention trigger: unexpected failure", err);
-    await replyQuietly(message, buildNoticeReply(userMessageFor(err, tr)));
+    await refuse(ctx, message, buildNoticeReply(userMessageFor(err, tr)));
   }
 }
 
 async function translateParent(ctx: AppContext, message: MentionMessage, tr: Translator): Promise<void> {
   if (!message.reference?.messageId) {
-    await replyQuietly(message, buildNoticeReply(tr.t("mention.hint")));
+    await refuse(ctx, message, buildNoticeReply(tr.t("mention.hint")));
     return;
   }
 
@@ -75,11 +81,11 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
   try {
     parent = await message.fetchReference();
   } catch {
-    await replyQuietly(message, buildNoticeReply(tr.t("mention.unreadable")));
+    await refuse(ctx, message, buildNoticeReply(tr.t("mention.unreadable")));
     return;
   }
   if (!parent.content.trim()) {
-    await replyQuietly(message, buildNoticeReply(tr.t("translate.noText")));
+    await refuse(ctx, message, buildNoticeReply(tr.t("translate.noText")));
     return;
   }
 
@@ -88,7 +94,8 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
   const spec = parseLanguageSpec(hint, supported, tr.language);
   // Free chat around the mention is fine; only the explicit colon form is strict.
   if (hint.includes(":") && spec.unresolved.length > 0) {
-    await replyQuietly(
+    await refuse(
+      ctx,
       message,
       buildNoticeReply(tr.t("translate.unknownLanguage", { name: spec.unresolved[0] ?? "" })),
     );
@@ -113,6 +120,11 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
     post: () =>
       replyQuietly(message, buildTranslationReply({ ...outcome, sourceId, source, supported, tr })),
   });
+}
+
+/** A refusal goes to the person who asked, never to the channel. */
+function refuse(ctx: AppContext, message: MentionMessage, payload: ReplyPayload): Promise<boolean> {
+  return sendDirect(ctx.log, message.author, payload, "mention trigger");
 }
 
 /** Replies without pinging the author again; they just posted and are watching. */

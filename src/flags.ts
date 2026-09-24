@@ -137,6 +137,20 @@ export function exampleSharedFlags(limit = 4): string {
     .join(" ");
 }
 
+/**
+ * A flag that asks for this backend code, for showing someone which languages
+ * are on offer. Two-letter regions only: a subdivision flag renders as a bare
+ * fallback on many clients, and every language here has a country that names
+ * it. The first region in table order wins, so the pairing is stable.
+ */
+export function flagForLanguage(code: string, supported: ReadonlySet<string>): string | null {
+  for (const [region, tableCode] of Object.entries(FLAG_LANGUAGES)) {
+    if (region.length !== 2) continue;
+    if (resolveLanguageCode(tableCode, supported) === code) return flagForRegion(region);
+  }
+  return null;
+}
+
 /** True for any country or subdivision flag, whether or not it names a language. */
 export function isFlagEmoji(emoji: string): boolean {
   return regionForFlag(emoji) !== null;

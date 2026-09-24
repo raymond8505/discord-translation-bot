@@ -11,7 +11,6 @@
   "translate.noText": "Dat bericht heeft geen tekst om te vertalen.",
   "mention.hint": "Antwoord op het bericht dat u wilt vertaald en @mention mij. Voeg een taal toe om het doel (`@bot french`) of `source:target` te kiezen om de bron te forceren (`@bot fr:en`, `@bot fr:`).",
   "mention.unreadable": "Ik kon het bericht waarop je reageerde niet lezen.",
-  "reaction.unsupported": "Ik heb geen taal voor {flag}. Kies een doelwit beneden.",
   "select.none": "Geen taal geselecteerd.",
   "select.expired": "De oorspronkelijke tekst is niet meer beschikbaar om te vertalen.",
   "reply.title": "Vertaling",
@@ -32,6 +31,5 @@
   "cmd.help.description": "Lijst met ondersteunde talen en hun codes",
   "help.title": "Ondersteunde talen",
   "help.intro": "Gebruik een naam of code hieronder als het doel, of `source:target` om de bron te forceren.",
-  "help.usage": "Antwoord op een bericht en @mention mij (`@bot`, `@bot fr:en`), gebruik `/translate`, of klik met de rechtermuisknop op een bericht en kies Apps, dan Vertalen Bericht.",
-  "help.flags": "Reageer op een bericht met een landvlag en ik post het in die taal voor het kanaal. Vlaggen die een taal delen zijn één verzoek: {flags} vragen allemaal om Engels, dus alleen de eerste berichten. Als ik geen taal heb voor een vlag, antwoord ik met een menu."
+  "help.usage": "Antwoord op een bericht en @mention mij (`@bot`, `@bot fr:en`), gebruik `/translate`, of klik met de rechtermuisknop op een bericht en kies Apps, dan Vertalen Bericht."
 }

@@ -3,6 +3,7 @@ import { BackendError } from "./backends/index.js";
 import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
 import { MESSAGE_ID, SPANISH_TEXT, lastReplyDescription, lastReplyPayload } from "./fixtures/interaction.fixture.js";
+import { lastDmDescription } from "./fixtures/dm.fixture.js";
 import { BOT_USER_ID, makeMentionMessage } from "./fixtures/message.fixture.js";
 import { frenchMessages } from "./fixtures/messages.fixture.js";
 import { handleMentionMessage } from "./mentions.js";
@@ -60,7 +61,8 @@ describe("handleMentionMessage", () => {
 
     const strict = makeMentionMessage({ content: `<@${BOT_USER_ID}> klingon:en` });
     await handleMentionMessage(ctx, strict);
-    expect(lastReplyDescription(strict)).toContain("klingon");
+    expect(lastDmDescription(strict.author)).toContain("klingon");
+    expect(strict.calls).toEqual([]);
 
     const chatty = makeMentionMessage({ content: `<@${BOT_USER_ID}> please` });
     await handleMentionMessage(ctx, chatty);
@@ -83,13 +85,26 @@ describe("handleMentionMessage", () => {
     expect(ctx.backend.translateCalls).toHaveLength(0);
   });
 
-  it("explains the trigger when mentioned outside a reply", async () => {
+  it("explains the trigger privately when mentioned outside a reply", async () => {
     const ctx = makeContext();
     const message = makeMentionMessage({ parent: null });
 
     await handleMentionMessage(ctx, message);
 
-    expect(lastReplyDescription(message)).toMatch(/Reply to the message/);
+    expect(lastDmDescription(message.author)).toMatch(/Reply to the message/);
+    // The channel is told nothing: nobody there asked for this.
+    expect(message.calls).toEqual([]);
+  });
+
+  it("drops a refusal the author will not accept rather than posting it", async () => {
+    const ctx = makeContext();
+    const message = makeMentionMessage({ parent: null, dmsClosed: true });
+
+    await handleMentionMessage(ctx, message);
+
+    expect(message.author.dms).toHaveLength(1);
+    expect(message.calls).toEqual([]);
+    expect(ctx.log.entries.some((e) => e.level === "warn")).toBe(true);
   });
 
   it("speaks the guild's preferred language and reads hints in it", async () => {
@@ -97,7 +112,7 @@ describe("handleMentionMessage", () => {
 
     const outsideReply = makeMentionMessage({ parent: null, preferredLocale: "fr" });
     await handleMentionMessage(ctx, outsideReply);
-    expect(lastReplyDescription(outsideReply)).toBe(frenchMessages["mention.hint"]);
+    expect(lastDmDescription(outsideReply.author)).toBe(frenchMessages["mention.hint"]);
 
     const hinted = makeMentionMessage({ content: `<@${BOT_USER_ID}> allemand`, preferredLocale: "fr" });
     await handleMentionMessage(ctx, hinted);
@@ -109,14 +124,14 @@ describe("handleMentionMessage", () => {
 
     const unreadable = makeMentionMessage({ parentUnreadable: true });
     await handleMentionMessage(ctx, unreadable);
-    expect(lastReplyDescription(unreadable)).toMatch(/couldn't read/);
+    expect(lastDmDescription(unreadable.author)).toMatch(/couldn't read/);
 
     const empty = makeMentionMessage({ parent: { id: MESSAGE_ID, content: "" } });
     await handleMentionMessage(ctx, empty);
-    expect(lastReplyDescription(empty)).toMatch(/no text/);
+    expect(lastDmDescription(empty.author)).toMatch(/no text/);
   });
 
-  it("words backend failures for the channel instead of throwing", async () => {
+  it("words backend failures privately instead of throwing", async () => {
     const backend = makeFakeBackend({
       translate: async () => {
         throw new BackendError("network", "down");
@@ -127,7 +142,8 @@ describe("handleMentionMessage", () => {
 
     await expect(handleMentionMessage(ctx, message)).resolves.toBeUndefined();
 
-    expect(lastReplyDescription(message)).toMatch(/still starting up/);
+    expect(lastDmDescription(message.author)).toMatch(/still starting up/);
+    expect(message.calls).toEqual([]);
     expect(ctx.log.entries.some((e) => e.level === "warn")).toBe(true);
   });
 

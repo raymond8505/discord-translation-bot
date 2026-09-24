@@ -1,12 +1,13 @@
 import type { AppContext } from "./context.js";
+import { sendDirect, type DirectRecipient } from "./dm.js";
 import { isOperational, userMessageFor } from "./errors.js";
 import { isFlagEmoji, languageForFlag } from "./flags.js";
 import type { Translator } from "./i18n/index.js";
 import { publishTranslation, type PostedMessage } from "./publish.js";
 import {
-  buildLanguagePickerReply,
   buildNoticeReply,
   buildTranslationReply,
+  buildUnsupportedFlagReply,
   type ReplyPayload,
 } from "./reply.js";
 import { sourceIdForMessage } from "./sourceId.js";
@@ -39,23 +40,25 @@ export interface FlagReaction extends ReactionSummary {
   fetch(): Promise<FlagReaction>;
 }
 
-export interface ReactingUser {
+export interface ReactingUser extends DirectRecipient {
   readonly bot: boolean;
-  readonly id: string;
 }
 
-/** Every flag the bot can't serve shares one bucket: one menu per message, not one per flag. */
+/** Every flag the bot can't serve shares one bucket: one DM per message, not one per flag. */
 const UNSUPPORTED_BUCKET = "unsupported";
 
 /**
  * The flag-reaction trigger: react 🇫🇷 to a message and the bot posts it in
- * French for the channel. Public like the mention trigger — a reaction is not
- * an interaction, so there is no ephemeral reply to give, and the menus on the
- * post answer each clicker privately anyway. A reaction carries no user
- * locale, so the reply is worded in the guild's preferred language.
+ * French for the channel. The translation is public; every refusal is a DM to
+ * whoever reacted. A reaction is not an interaction, so there is no ephemeral
+ * reply to give, and a refusal concerns one person — the channel asked for
+ * nothing and should not be told. A DM the user does not accept is dropped.
+ *
+ * A reaction carries no user locale (only interactions have one), so even the
+ * DM is worded in the guild's preferred language.
  *
  * Reactions that are not flags are ignored in silence; a flag the bot has no
- * language for gets the menus instead, so nothing is left unanswered.
+ * language for is answered privately with the flags that would have worked.
  */
 export async function handleFlagReaction(
   ctx: AppContext,
@@ -67,8 +70,8 @@ export async function handleFlagReaction(
 
   // Before the partial fetches below, which are themselves API calls: a partial
   // message still carries guildId, so nothing has to be fetched to decide this.
-  // Silent when over budget, for the same reason as the mention trigger — this
-  // reply is public, and a notice per refused reaction is its own flood.
+  // Silent when over budget, not a DM: a refusal per refused reaction is its
+  // own flood, and the budget sits far above conversational use anyway.
   const limit = await ctx.rateLimiter.check({ userId: user.id, guildId: reaction.message.guildId });
   if (!limit.allowed) {
     ctx.log.warn(`flag reaction: rate limited (${limit.scope ?? "unknown"} budget); ignoring`);
@@ -92,11 +95,11 @@ export async function handleFlagReaction(
 
   const tr = ctx.i18n.forLocale(message.guild?.preferredLocale ?? "");
   try {
-    await translateForFlag(ctx, message, full.emoji.name ?? "", tr);
+    await translateForFlag(ctx, message, full.emoji.name ?? "", tr, user);
   } catch (err) {
     if (isOperational(err)) ctx.log.warn("flag reaction: backend failure", err);
     else ctx.log.error("flag reaction: unexpected failure", err);
-    await replyQuietly(message, buildNoticeReply(userMessageFor(err, tr)));
+    await sendDirect(ctx.log, user, buildNoticeReply(userMessageFor(err, tr)), "flag reaction");
   }
 }
 
@@ -105,6 +108,7 @@ async function translateForFlag(
   message: ReactedMessage,
   emoji: string,
   tr: Translator,
+  user: ReactingUser,
 ): Promise<void> {
   const supported = await ctx.languages.get();
   const target = languageForFlag(emoji, supported);
@@ -112,21 +116,18 @@ async function translateForFlag(
 
   const sourceId = sourceIdForMessage(message.id);
   if (target === null) {
-    await replyQuietly(
-      message,
-      buildLanguagePickerReply({
-        sourceId,
-        supported,
-        tr,
-        notice: tr.t("reaction.unsupported", { flag: emoji }),
-      }),
+    await sendDirect(
+      ctx.log,
+      user,
+      buildUnsupportedFlagReply({ flag: emoji, supported, tr }),
+      "flag reaction",
     );
     return;
   }
 
   const text = message.content ?? "";
   if (!text.trim()) {
-    await replyQuietly(message, buildNoticeReply(tr.t("translate.noText")));
+    await sendDirect(ctx.log, user, buildNoticeReply(tr.t("translate.noText")), "flag reaction");
     return;
   }
 

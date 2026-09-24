@@ -6,8 +6,8 @@
 | --- | --- | --- |
 | `/translate text: [target]` | `src/commands/translate.ts` | **public** `channel.send` (ephemeral reply only when there is no channel to post to) |
 | "Translate Message" context menu | `src/commands/translateMessage.ts` | **public** reply to the target message |
-| Reply + `@mention` (optional language hint) | `src/mentions.ts` (`MessageCreate`) | **public** reply |
-| Flag reaction (🇫🇷 on any message) | `src/reactions.ts` (`MessageReactionAdd`) | **public** reply |
+| Reply + `@mention` (optional language hint) | `src/mentions.ts` (`MessageCreate`) | **public** reply; every refusal is a DM |
+| Flag reaction (🇫🇷 on any message) | `src/reactions.ts` (`MessageReactionAdd`) | **public** reply; every refusal is a DM |
 | Language select menus | `src/components/languageSelect.ts` | **public** `channel.send`, a new post per pick |
 | `/tb-help` (supported languages and their codes) | `src/commands/help.ts` | ephemeral — not a translation |
 
@@ -40,6 +40,26 @@ Add a new command by exporting its builder from `src/commands/`, appending it to
 - **Every string goes through `ctx.i18n.forLocale(interaction.locale)`** (guild locale on the mention
   trigger); language names and hint parsing take `tr.language`. See [i18n.md](i18n.md).
 - **Every trigger that can reach the backend checks `ctx.rateLimiter` first** — see below.
+
+## Refusals are private, translations are public
+
+Only an **interaction** can answer ephemerally. The mention trigger and the flag reaction have no
+interaction token, so a refusal there has nowhere ephemeral to go — and posting it in the channel
+tells everyone about a problem one person had. Both therefore **DM the person who asked**, through
+`sendDirect()` (`src/dm.ts`), and say nothing in the channel. The translation itself stays public.
+
+A closed DM (`50007` — the member disallows messages from the guild's bots) is the ordinary case,
+not an error: it is logged and the refusal is dropped. There is deliberately **no fallback to a
+channel post**, because that would make privacy depend on a setting the bot cannot see beforehand.
+
+The DM is worded in the **guild's** preferred locale, not the recipient's. Discord exposes a user
+locale only on interactions — `User` carries none — so neither trigger can know it.
+
+A flag with no language gets `buildUnsupportedFlagReply()` (`src/reply.ts`): the flag that failed,
+every flag that would have worked with its language name, and a line pointing at the server admin.
+It carries **no menus**, because a pick made inside a DM would post the translation into that DM
+instead of the channel the reaction happened in. Languages come from `menuLanguages()` and flags from
+`flagForLanguage()` (`src/flags.ts`), so the list can never name a language the backend did not load.
 
 ## Rate limiting
 
@@ -90,8 +110,9 @@ no user locale). Free chat around the mention is tolerated; only the colon form 
 name. Replies use `allowedMentions: { repliedUser: false }`.
 
 `/translate` mirrors this: `target` accepts the colon form too, and a separate `source` option
-(autocompleted) forces the source. A forced source bypasses the cache read and overwrites the entry
-(`src/translate.ts`), so it corrects a wrong detection for everyone.
+(autocompleted) forces the source. A forced source is keyed and read separately from a detection and
+also writes the `auto` entry (`src/translate.ts`), so it corrects a wrong detection for everyone —
+see [translation.md](translation.md).
 
 ## Flag reactions
 
@@ -102,12 +123,11 @@ never loaded the language resolves to null exactly like an unmapped country. Sub
 every English-speaking flag is `en`, never `en-GB`. Anything that is not a region flag (👍, 🏴‍☠️, a
 custom emoji) is ignored in silence — the trigger must not answer every reaction in the guild.
 
-A flag with no language gets `buildLanguagePickerReply()`: the notice plus the ordinary target menus
-(`lang:t:0:auto:<messageId>`), so the pick runs through the select handler and the text comes back
-from `channel.messages.fetch`. Duplicates are judged **by language, not emoji** — `alreadyAsked()`
+A flag with no language gets a DM listing the flags that do work — see *Refusals are private* above.
+Duplicates are judged **by language, not emoji** — `alreadyAsked()`
 sums the counts of every flag on the message resolving to the same code (all unservable flags share
-one bucket), and the handled reaction is itself in `message.reactions.cache`, so two means someone
-already asked. Reactions on the bot's own posts are skipped (their text lives in an embed);
+one bucket, so one DM per message rather than one per flag), and the handled reaction is itself in
+`message.reactions.cache`, so two means someone already asked. Reactions on the bot's own posts are skipped (their text lives in an embed);
 reaction *removal* does nothing.
 
 ## Menus and the customId scheme

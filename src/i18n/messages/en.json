@@ -11,7 +11,9 @@
   "translate.noText": "That message has no text to translate.",
   "mention.hint": "Reply to the message you want translated and @mention me. Add a language to pick the target (`@bot french`), or `source:target` to force the source too (`@bot fr:en`, `@bot fr:`).",
   "mention.unreadable": "I couldn't read the message you replied to.",
-  "reaction.unsupported": "I don't have a language for {flag}. Pick a target below.",
+  "reaction.unsupportedFlag": "I don't have a language for {flag}.",
+  "reaction.supportedFlags": "Flags I can translate into:",
+  "reaction.askAdmin": "Ask a server admin to add the language you need.",
   "select.none": "No language selected.",
   "select.expired": "The original text is no longer available to translate.",
   "reply.title": "Translation",
@@ -34,5 +36,5 @@
   "help.title": "Supported languages",
   "help.intro": "Use any name or code below as the target, or `source:target` to force the source too.",
   "help.usage": "React with a flag, reply to a message and @mention me (`@bot`, `@bot fr:en`), use `/translate`, or right-click a message and pick Apps, then Translate Message.",
-  "help.flags": "React to a message with a country flag and I post it in that language for the channel. Flags that share a language are one request: {flags} all ask for English, so only the first one posts. If I have no language for a flag, I answer with a menu instead."
+  "help.flags": "React to a message with a country flag and I post it in that language for the channel. Flags that share a language are one request: {flags} all ask for English, so only the first one posts. If I have no language for a flag, I send you a private message listing the ones I do have."
 }

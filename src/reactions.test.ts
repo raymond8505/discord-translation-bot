@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BackendError } from "./backends/index.js";
 import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
+import { lastDmDescription } from "./fixtures/dm.fixture.js";
 import { lastReplyDescription, lastReplyPayload, MESSAGE_ID, SPANISH_TEXT } from "./fixtures/interaction.fixture.js";
 import { BOT_USER_ID } from "./fixtures/message.fixture.js";
 import { frenchMessages } from "./fixtures/messages.fixture.js";
@@ -101,19 +102,37 @@ describe("handleFlagReaction", () => {
     expect(ctx.backend.translateCalls).toEqual([{ text: SPANISH_TEXT, source: "auto", target: "fr" }]);
   });
 
-  it("offers the target menus when the flag names no language it can serve", async () => {
+  it("privately lists the flags that would have worked, and tells the channel nothing", async () => {
     const ctx = makeContext();
+    const user = makeReactingUser();
     const reaction = makeFlagReaction({ emoji: FLAGS.cambodia });
 
-    await handleFlagReaction(ctx, reaction, makeReactingUser());
+    await handleFlagReaction(ctx, reaction, user);
 
     expect(ctx.backend.translateCalls).toEqual([]);
-    expect(lastReplyDescription(reaction)).toContain(FLAGS.cambodia);
-    const menu = lastReplyPayload(reaction)?.components[0]?.toJSON().components[0];
-    expect(menu?.custom_id).toBe(`lang:t:0:auto:${MESSAGE_ID}`);
+    const dm = lastDmDescription(user);
+    expect(dm).toContain(FLAGS.cambodia);
+    // A flag that does work, its language, and who to ask for the one that doesn't.
+    expect(dm).toContain(`${FLAGS.germany} German`);
+    expect(dm).toMatch(/server admin/);
+    // No menus: a pick made in a DM would post the translation into the DM.
+    expect(user.dms[0]?.components).toEqual([]);
+    expect(reaction.calls).toEqual([]);
   });
 
-  it("posts one menu per message however many flags it can't serve", async () => {
+  it("drops a refusal the reactor will not accept rather than posting it", async () => {
+    const ctx = makeContext();
+    const user = makeReactingUser(false, undefined, { closed: true });
+    const reaction = makeFlagReaction({ emoji: FLAGS.cambodia });
+
+    await handleFlagReaction(ctx, reaction, user);
+
+    expect(user.dms).toHaveLength(1);
+    expect(reaction.calls).toEqual([]);
+    expect(ctx.log.entries.some((e) => e.level === "warn")).toBe(true);
+  });
+
+  it("sends one refusal per message however many flags it can't serve", async () => {
     const ctx = makeContext();
     // Croatian is a table language this backend never loaded; both flags land in the same bucket.
     const reaction = makeFlagReaction({ emoji: FLAGS.cambodia, siblings: { [FLAGS.croatia]: 1 } });
@@ -123,14 +142,17 @@ describe("handleFlagReaction", () => {
     expect(reaction.calls).toEqual([]);
   });
 
-  it("says so when the message has no text to translate", async () => {
+  it("says so privately when the message has no text to translate", async () => {
     const ctx = makeContext();
+    const user = makeReactingUser();
     const reaction = makeFlagReaction({ content: "", preferredLocale: "fr" });
 
-    await handleFlagReaction(ctx, reaction, makeReactingUser());
+    await handleFlagReaction(ctx, reaction, user);
 
     expect(ctx.backend.translateCalls).toEqual([]);
-    expect(lastReplyDescription(reaction)).toBe(frenchMessages["translate.noText"]);
+    // The guild locale, not the reactor's: a reaction carries no user locale.
+    expect(lastDmDescription(user)).toBe(frenchMessages["translate.noText"]);
+    expect(reaction.calls).toEqual([]);
   });
 
   it("words a backend failure for the guild and logs it as operational", async () => {
@@ -141,11 +163,13 @@ describe("handleFlagReaction", () => {
         },
       }),
     });
+    const user = makeReactingUser();
     const reaction = makeFlagReaction();
 
-    await handleFlagReaction(ctx, reaction, makeReactingUser());
+    await handleFlagReaction(ctx, reaction, user);
 
-    expect(lastReplyDescription(reaction)).toMatch(/still starting up/);
+    expect(lastDmDescription(user)).toMatch(/still starting up/);
+    expect(reaction.calls).toEqual([]);
     expect(ctx.log.entries.map((entry) => entry.level)).toContain("warn");
     expect(ctx.log.entries.some((entry) => entry.level === "error")).toBe(false);
   });

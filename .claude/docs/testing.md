@@ -25,7 +25,8 @@ image.
 | `post.fixture.ts` | `CHANNEL_ID` / `POSTED_MESSAGE_ID`, `makePostRef()`, and `makePostedMessages()` — a fresh id per post, so a fixture driven twice records two distinct posts and the registry keeps both |
 | `messageEditor.fixture.ts` | `makeFakeMessageEditor()` — records every `edit`, and replays `gone` or a rejection for named message ids |
 | `invalidation.fixture.ts` | `makeEditedMessage()` — the `messageUpdate` payload, partial or full, with `fetchCalls` proving the partial path |
-| `message.fixture.ts` | `makeMentionMessage()` for the mention trigger |
+| `message.fixture.ts` | `makeMentionMessage()` for the mention trigger; its `author` is a recipient, so `message.author.dms` holds the refusals it was sent (`dmsClosed` makes them fail) |
+| `dm.fixture.ts` | `makeRecipient()` — records every `send` in `dms` **before** throwing, so a test can tell "never tried" from "refused"; `lastDmDescription()` reads the last one |
 | `reaction.fixture.ts` | `makeFlagReaction()` (siblings seed `reactions.cache` for the duplicate rule; `fetchCalls` proves the partial path), `makeReactingUser()`, and the `FLAGS` / `NON_FLAGS` emoji written as escapes |
 
 ## Patterns

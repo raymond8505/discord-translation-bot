@@ -1,5 +1,6 @@
 import type { FlagReaction, ReactedMessage, ReactingUser, ReactionSummary } from "../reactions.js";
 import type { ReplyPayload } from "../reply.js";
+import { makeRecipient, type FakeRecipient, type RecipientOptions } from "./dm.fixture.js";
 import { GUILD_ID, MESSAGE_ID, SPANISH_TEXT, USER_ID, type ResponseLog } from "./interaction.fixture.js";
 import { BOT_USER_ID } from "./message.fixture.js";
 import { makePostedMessages } from "./post.fixture.js";
@@ -116,6 +117,12 @@ export function makeFlagReaction(options: FlagReactionOptions = {}): FakeFlagRea
   return reaction;
 }
 
-export function makeReactingUser(isBot = false, id: string = USER_ID): ReactingUser {
-  return { bot: isBot, id };
+export type FakeReactingUser = ReactingUser & FakeRecipient;
+
+export function makeReactingUser(
+  isBot = false,
+  id: string = USER_ID,
+  options: RecipientOptions = {},
+): FakeReactingUser {
+  return { ...makeRecipient({ id, ...options }), bot: isBot };
 }

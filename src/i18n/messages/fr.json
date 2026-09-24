@@ -11,7 +11,6 @@
   "translate.noText": "Ce message n'a pas de texte à traduire.",
   "mention.hint": "Répondre au message que vous voulez traduire et @mentionnez-moi. Ajouter une langue pour sélectionner la cible (`@bot french`), ou `source:target` pour forcer la source aussi (`@bot fr:en`, `@bot fr:`).",
   "mention.unreadable": "Je ne pouvais pas lire le message auquel vous avez répondu.",
-  "reaction.unsupported": "Je n'ai pas de langue pour {flag}. Choisissez une cible ci-dessous.",
   "select.none": "Aucune langue sélectionnée.",
   "select.expired": "Le texte original n'est plus disponible à traduire.",
   "reply.title": "Traduction",
@@ -32,6 +31,5 @@
   "cmd.help.description": "Énumérer les langues prises en charge et leurs codes",
   "help.title": "Langues prises en charge",
   "help.intro": "Utilisez n'importe quel nom ou code ci-dessous comme cible, ou `source:target` pour forcer la source aussi.",
-  "help.usage": "Répondre à un message et @mentionnez-moi (`@bot`, `@bot fr:en`), utiliser `/translate`, ou faire un clic droit sur un message et sélectionner des applications, puis traduire le message.",
-  "help.flags": "Réagissez à un message avec un drapeau de pays et je le poste dans cette langue pour la chaîne. Les drapeaux qui partagent une langue sont une requête : {flags} tous demandent l'anglais, donc seulement les premiers messages. Si je n'ai pas de langue pour un drapeau, je réponds avec un menu à la place."
+  "help.usage": "Répondre à un message et @mentionnez-moi (`@bot`, `@bot fr:en`), utiliser `/translate`, ou faire un clic droit sur un message et sélectionner des applications, puis traduire le message."
 }

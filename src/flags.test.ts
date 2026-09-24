@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exampleSharedFlags, flagForRegion, isFlagEmoji, languageForFlag, regionForFlag } from "./flags.js";
+import { exampleSharedFlags, flagForLanguage, flagForRegion, isFlagEmoji, languageForFlag, regionForFlag } from "./flags.js";
 import { libreLanguageCodes, makeSupported, primaryOnlyCodes } from "./fixtures/languages.fixture.js";
 import { FLAGS, NON_FLAGS } from "./fixtures/reaction.fixture.js";
 
@@ -61,4 +61,18 @@ describe("languageForFlag", () => {
     expect(languageForFlag(FLAGS.japan, supported)).toBe("ja");
     expect(languageForFlag(NON_FLAGS.thumbsUp, supported)).toBeNull();
   });
+
+  it("names a flag for each language, inverting the table", () => {
+    expect(flagForLanguage("de", supported)).toBe(FLAGS.germany);
+    expect(flagForLanguage("ja", supported)).toBe(FLAGS.japan);
+    // First region in table order wins, so the pairing never drifts.
+    expect(flagForLanguage("pt-BR", supported)).toBe(FLAGS.brazil);
+  });
+
+  it("has no flag for a language the backend does not serve", () => {
+    // Croatian is in the table but unloaded here, so nothing resolves to it.
+    expect(flagForLanguage("hr", supported)).toBeNull();
+    expect(flagForLanguage("klingon", supported)).toBeNull();
+  });
+
 });

@@ -10,6 +10,7 @@ import {
   buildSelectCustomId,
   type SelectRole,
 } from "./components/customId.js";
+import { flagForLanguage } from "./flags.js";
 import type { Translator } from "./i18n/index.js";
 import { labelFor, menuLanguages, type MenuLanguage } from "./locale.js";
 
@@ -117,6 +118,42 @@ export function buildNoticeReply(message: string): ReplyPayload {
     embeds: [new EmbedBuilder().setDescription(message)],
     components: [],
   };
+}
+
+export interface UnsupportedFlagInput {
+  readonly flag: string;
+  readonly supported: ReadonlySet<string>;
+  readonly tr: Translator;
+}
+
+/**
+ * The private answer to a flag the bot has no language for: what went wrong,
+ * every flag that would have worked, and who to ask for the one that didn't.
+ *
+ * It lists flags rather than offering menus because it is delivered by DM,
+ * and a menu answered in a DM would post the translation into that DM instead
+ * of the channel the reaction happened in — every translation is a public
+ * channel message. A flag is also the thing to reach for next: the reader is
+ * someone who just used one.
+ *
+ * Languages come from `menuLanguages()`, so the names are in the same language
+ * and the same order as the menus everywhere else, and a language the backend
+ * did not load cannot appear. One without a country flag in the table is
+ * listed by name alone rather than dropped — it is still translatable.
+ */
+export function buildUnsupportedFlagReply(input: UnsupportedFlagInput): ReplyPayload {
+  const { flag, supported, tr } = input;
+  const lines = menuLanguages(supported, tr.language).map((language) => {
+    const emoji = flagForLanguage(language.code, supported);
+    return emoji ? `${emoji} ${language.label}` : language.label;
+  });
+
+  // Glue lives in code; only the sentences are translated.
+  const parts = [tr.t("reaction.unsupportedFlag", { flag })];
+  if (lines.length > 0) parts.push(`${tr.t("reaction.supportedFlags")}\n${lines.join("\n")}`);
+  parts.push(tr.t("reaction.askAdmin"));
+
+  return buildNoticeReply(parts.join("\n\n"));
 }
 
 export interface LanguagePickerInput {

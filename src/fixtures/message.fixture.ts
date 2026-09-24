@@ -3,6 +3,7 @@ import type { MentionMessage } from "../mentions.js";
 import type { ReplyPayload } from "../reply.js";
 import type { ResponseLog } from "./interaction.fixture.js";
 import { GUILD_ID, MESSAGE_ID, SPANISH_TEXT, USER_ID } from "./interaction.fixture.js";
+import { makeRecipient, type FakeRecipient } from "./dm.fixture.js";
 import { makePostedMessages } from "./post.fixture.js";
 
 export const BOT_USER_ID = "999999999999999999";
@@ -21,6 +22,8 @@ export interface MentionMessageOptions {
   clientReady?: boolean;
   /** Who sent the tagging message; the actor the rate limiter counts. */
   authorId?: string;
+  /** The author disallows DMs, so every refusal is dropped. */
+  dmsClosed?: boolean;
   /** `null` models a DM, where there is no guild budget to spend. */
   guildId?: string | null;
 }
@@ -28,6 +31,8 @@ export interface MentionMessageOptions {
 export interface FakeMentionMessage extends MentionMessage, ResponseLog {
   /** Options passed to `mentions.has`, for asserting the ignore flags. */
   readonly hasOptions: MessageMentionsHasOptions[];
+  /** Narrowed so a test can read the refusals the author was sent. */
+  readonly author: MentionMessage["author"] & FakeRecipient;
 }
 
 export function makeMentionMessage(options: MentionMessageOptions = {}): FakeMentionMessage {
@@ -39,7 +44,7 @@ export function makeMentionMessage(options: MentionMessageOptions = {}): FakeMen
     calls,
     hasOptions,
     content: options.content ?? `<@${BOT_USER_ID}>`,
-    author: { bot: options.authorIsBot ?? false, id: options.authorId ?? USER_ID },
+    author: { ...makeRecipient({ id: options.authorId ?? USER_ID, closed: options.dmsClosed }), bot: options.authorIsBot ?? false },
     client: { user: options.clientReady === false ? null : { id: BOT_USER_ID } },
     guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     guild: { preferredLocale: options.preferredLocale ?? "en-US" },
