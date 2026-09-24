@@ -1,6 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { translationKey } from "../cache.js";
+import { lastPostFlags } from "../fixtures/interaction.fixture.js";
 import { alwaysLimited, makeContext } from "../fixtures/context.fixture.js";
 import {
   lastPostDescription,
@@ -201,4 +202,17 @@ describe("handleTranslateAutocomplete", () => {
     expect(lastReplyDescription(interaction)).not.toContain("2400");
     expect(ctx.backend.translateCalls).toEqual([]);
   });
+
+  it("posts silently into a thread, and normally outside one", async () => {
+    const ctx = makeContext();
+
+    const thread = makeChatInputInteraction({ text: "hola", target: "ja", inThread: true });
+    await handleTranslate(ctx, thread);
+    expect(lastPostFlags(thread)).toBe(MessageFlags.SuppressNotifications);
+
+    const channel = makeChatInputInteraction({ text: "hola", target: "de" });
+    await handleTranslate(ctx, channel);
+    expect(lastPostFlags(channel)).toBeUndefined();
+  });
+
 });

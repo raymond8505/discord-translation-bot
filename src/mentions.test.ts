@@ -1,8 +1,9 @@
+import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { BackendError } from "./backends/index.js";
 import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
-import { MESSAGE_ID, SPANISH_TEXT, lastReplyDescription, lastReplyPayload } from "./fixtures/interaction.fixture.js";
+import { MESSAGE_ID, SPANISH_TEXT, lastPostFlags, lastReplyDescription, lastReplyPayload } from "./fixtures/interaction.fixture.js";
 import { lastDmDescription } from "./fixtures/dm.fixture.js";
 import { BOT_USER_ID, makeMentionMessage } from "./fixtures/message.fixture.js";
 import { frenchMessages } from "./fixtures/messages.fixture.js";
@@ -159,4 +160,17 @@ describe("handleMentionMessage", () => {
     expect(ctx.backend.translateCalls).toEqual([]);
     expect(ctx.log.entries.some((e) => e.message.includes("rate limited"))).toBe(true);
   });
+
+  it("posts silently into a thread, and normally outside one", async () => {
+    const ctx = makeContext();
+
+    const thread = makeMentionMessage({ content: `<@${BOT_USER_ID}> ja`, inThread: true });
+    await handleMentionMessage(ctx, thread);
+    expect(lastPostFlags(thread)).toBe(MessageFlags.SuppressNotifications);
+
+    const channel = makeMentionMessage({ content: `<@${BOT_USER_ID}> de` });
+    await handleMentionMessage(ctx, channel);
+    expect(lastPostFlags(channel)).toBeUndefined();
+  });
+
 });

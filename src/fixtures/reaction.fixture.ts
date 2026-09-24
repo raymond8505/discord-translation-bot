@@ -38,6 +38,9 @@ export const NON_FLAGS = {
 export const AUTHOR_ID = "111111111111111111";
 
 export interface FlagReactionOptions {
+  /** Post into a thread, where a translation lands without notifying its followers. */
+  inThread?: boolean;
+
   /** The flag reacted with; defaults to 🇫🇷. */
   emoji?: string;
   /** The reacted-to message's text; `""` models an image-only post. */
@@ -90,6 +93,7 @@ export function makeFlagReaction(options: FlagReactionOptions = {}): FakeFlagRea
     guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     guild: { preferredLocale: options.preferredLocale ?? "en-US" },
     reactions: { cache },
+    channel: { isThread: () => options.inThread ?? false },
     async fetch() {
       fetchCalls.push("message");
       if (options.unreadable) throw new Error("Unknown Message");

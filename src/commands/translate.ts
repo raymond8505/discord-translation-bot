@@ -11,6 +11,7 @@ import { menuLanguages, parseLanguageHint, parseLanguageSpec, resolveTarget } fr
 import { publishTranslation, type PostedMessage } from "../publish.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForText } from "../sourceId.js";
+import { postOptionsFor, type PostChannel, type PostOptions } from "../threads.js";
 import { AUTO_SOURCE, MAX_INPUT_CHARS, translateWithCache } from "../translate.js";
 
 export const TRANSLATE_COMMAND_NAME = "translate";
@@ -64,7 +65,12 @@ export interface TranslateInteraction {
    * discord.js has that cannot be posted to (a partial group DM); either way
    * there is no room to put the translation in.
    */
-  readonly channel: { readonly id: string; send?(payload: ReplyPayload): Promise<PostedMessage> } | null;
+  readonly channel:
+    | (PostChannel & {
+        readonly id: string;
+        send?(payload: ReplyPayload & PostOptions): Promise<PostedMessage>;
+      })
+    | null;
   deferReply(options: { flags: MessageFlags.Ephemeral }): Promise<unknown>;
   editReply(payload: ReplyPayload): Promise<unknown>;
 }
@@ -133,7 +139,7 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
     sourceId,
     target: outcome.target,
     source: source ?? AUTO_SOURCE,
-    post: () => send(reply),
+    post: () => send({ ...reply, ...postOptionsFor(interaction.channel) }),
   });
   await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
 }

@@ -4,6 +4,7 @@ import { rateLimitMessageFor } from "../errors.js";
 import { publishTranslation, type PostedMessage } from "../publish.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { isMessageSourceId } from "../sourceId.js";
+import { postOptionsFor, type PostChannel, type PostOptions } from "../threads.js";
 import { AUTO_SOURCE, translateWithCache } from "../translate.js";
 import { AUTO_VALUE, parseSelectCustomId } from "./customId.js";
 
@@ -15,10 +16,12 @@ export interface LanguageSelectInteraction {
   readonly customId: string;
   readonly values: readonly string[];
   /** `send` is absent on the one channel kind that cannot be posted to (a partial group DM). */
-  readonly channel: {
-    readonly messages: { fetch(id: string): Promise<{ readonly content: string }> };
-    send?(payload: ReplyPayload): Promise<PostedMessage>;
-  } | null;
+  readonly channel:
+    | (PostChannel & {
+        readonly messages: { fetch(id: string): Promise<{ readonly content: string }> };
+        send?(payload: ReplyPayload & PostOptions): Promise<PostedMessage>;
+      })
+    | null;
   deferReply(options: { flags: MessageFlags.Ephemeral }): Promise<unknown>;
   editReply(payload: ReplyPayload): Promise<unknown>;
 }
@@ -91,7 +94,7 @@ export async function handleLanguageSelect(
     sourceId: parsed.sourceId,
     target: outcome.target,
     source: forced ?? AUTO_SOURCE,
-    post: () => send(reply),
+    post: () => send({ ...reply, ...postOptionsFor(interaction.channel) }),
   });
   await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
 }

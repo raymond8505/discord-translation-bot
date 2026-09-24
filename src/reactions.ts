@@ -11,6 +11,7 @@ import {
   type ReplyPayload,
 } from "./reply.js";
 import { sourceIdForMessage } from "./sourceId.js";
+import { postOptionsFor, type PostChannel, type PostOptions } from "./threads.js";
 import { AUTO_SOURCE, translateWithCache } from "./translate.js";
 
 /** The slice of `MessageReaction` every reaction on the message is read through. */
@@ -30,8 +31,11 @@ export interface ReactedMessage {
   readonly guildId: string | null;
   readonly guild: { readonly preferredLocale: string } | null;
   readonly reactions: { readonly cache: ReadonlyMap<string, ReactionSummary> };
+  readonly channel: PostChannel | null;
   fetch(): Promise<ReactedMessage>;
-  reply(options: ReplyPayload & { allowedMentions: { repliedUser: boolean } }): Promise<PostedMessage>;
+  reply(
+    options: ReplyPayload & { allowedMentions: { repliedUser: boolean } } & PostOptions,
+  ): Promise<PostedMessage>;
 }
 
 export interface FlagReaction extends ReactionSummary {
@@ -170,5 +174,9 @@ function alreadyAsked(
 
 /** Replies without pinging the author; they wrote the message, they didn't ask for this. */
 function replyQuietly(message: ReactedMessage, payload: ReplyPayload): Promise<PostedMessage> {
-  return message.reply({ ...payload, allowedMentions: { repliedUser: false } });
+  return message.reply({
+    ...payload,
+    allowedMentions: { repliedUser: false },
+    ...postOptionsFor(message.channel),
+  });
 }

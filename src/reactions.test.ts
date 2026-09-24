@@ -1,9 +1,10 @@
+import { MessageFlags } from "discord.js";
 import { describe, expect, it } from "vitest";
 import { BackendError } from "./backends/index.js";
 import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
 import { lastDmDescription } from "./fixtures/dm.fixture.js";
-import { lastReplyDescription, lastReplyPayload, MESSAGE_ID, SPANISH_TEXT } from "./fixtures/interaction.fixture.js";
+import { lastPostFlags, lastReplyDescription, lastReplyPayload, MESSAGE_ID, SPANISH_TEXT } from "./fixtures/interaction.fixture.js";
 import { BOT_USER_ID } from "./fixtures/message.fixture.js";
 import { frenchMessages } from "./fixtures/messages.fixture.js";
 import { FLAGS, makeFlagReaction, makeReactingUser, NON_FLAGS } from "./fixtures/reaction.fixture.js";
@@ -186,4 +187,17 @@ describe("handleFlagReaction", () => {
     expect(reaction.message.calls).toEqual([]);
     expect(ctx.backend.translateCalls).toEqual([]);
   });
+
+  it("posts silently into a thread, and normally outside one", async () => {
+    const ctx = makeContext();
+
+    const thread = makeFlagReaction({ emoji: FLAGS.japan, inThread: true });
+    await handleFlagReaction(ctx, thread, makeReactingUser());
+    expect(lastPostFlags(thread)).toBe(MessageFlags.SuppressNotifications);
+
+    const channel = makeFlagReaction({ emoji: FLAGS.germany });
+    await handleFlagReaction(ctx, channel, makeReactingUser());
+    expect(lastPostFlags(channel)).toBeUndefined();
+  });
+
 });

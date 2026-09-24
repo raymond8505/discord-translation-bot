@@ -5,6 +5,7 @@ import { alwaysLimited, makeContext } from "../fixtures/context.fixture.js";
 import {
   MESSAGE_ID,
   lastPostDescription,
+  lastPostFlags,
   lastPostPayload,
   lastReplyDescription,
   makeSelectInteraction,
@@ -147,4 +148,17 @@ describe("handleLanguageSelect", () => {
     expect(lastReplyDescription(interaction)).toContain("9");
     expect(ctx.backend.translateCalls).toEqual([]);
   });
+
+  it("posts silently into a thread, and normally outside one", async () => {
+    const ctx = makeContext({ redis: withSource("hola") });
+
+    const thread = makeSelectInteraction({ customId: targetMenu, value: "ja", inThread: true });
+    await handleLanguageSelect(ctx, thread);
+    expect(lastPostFlags(thread)).toBe(MessageFlags.SuppressNotifications);
+
+    const channel = makeSelectInteraction({ customId: targetMenu, value: "de" });
+    await handleLanguageSelect(ctx, channel);
+    expect(lastPostFlags(channel)).toBeUndefined();
+  });
+
 });

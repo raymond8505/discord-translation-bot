@@ -7,6 +7,7 @@ import { parseLanguageSpec, resolveTarget } from "./locale.js";
 import { publishTranslation, type PostedMessage } from "./publish.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "./reply.js";
 import { sourceIdForMessage } from "./sourceId.js";
+import { postOptionsFor, type PostChannel, type PostOptions } from "./threads.js";
 import { AUTO_SOURCE, translateWithCache } from "./translate.js";
 
 /** The slice of `Message` the mention trigger touches. */
@@ -17,9 +18,12 @@ export interface MentionMessage {
   readonly guildId: string | null;
   readonly guild: { readonly preferredLocale: string } | null;
   readonly reference: { readonly messageId: string | undefined } | null;
+  readonly channel: PostChannel | null;
   readonly mentions: { has(userId: string, options?: MessageMentionsHasOptions): boolean };
   fetchReference(): Promise<{ readonly id: string; readonly content: string }>;
-  reply(options: ReplyPayload & { allowedMentions: { repliedUser: boolean } }): Promise<PostedMessage>;
+  reply(
+    options: ReplyPayload & { allowedMentions: { repliedUser: boolean } } & PostOptions,
+  ): Promise<PostedMessage>;
 }
 
 /**
@@ -129,5 +133,9 @@ function refuse(ctx: AppContext, message: MentionMessage, payload: ReplyPayload)
 
 /** Replies without pinging the author again; they just posted and are watching. */
 function replyQuietly(message: MentionMessage, payload: ReplyPayload): Promise<PostedMessage> {
-  return message.reply({ ...payload, allowedMentions: { repliedUser: false } });
+  return message.reply({
+    ...payload,
+    allowedMentions: { repliedUser: false },
+    ...postOptionsFor(message.channel),
+  });
 }

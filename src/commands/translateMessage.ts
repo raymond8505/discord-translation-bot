@@ -7,6 +7,7 @@ import { resolveTarget } from "../locale.js";
 import { publishTranslation, type PostedMessage } from "../publish.js";
 import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../reply.js";
 import { sourceIdForMessage } from "../sourceId.js";
+import { postOptionsFor, type PostChannel, type PostOptions } from "../threads.js";
 import { AUTO_SOURCE, translateWithCache } from "../translate.js";
 
 /** The default name is what `interaction.commandName` carries whatever the user's locale. */
@@ -25,8 +26,9 @@ export interface TranslateMessageInteraction {
   readonly targetMessage: {
     readonly id: string;
     readonly content: string;
+    readonly channel: PostChannel | null;
     reply(
-      options: ReplyPayload & { allowedMentions: { repliedUser: boolean } },
+      options: ReplyPayload & { allowedMentions: { repliedUser: boolean } } & PostOptions,
     ): Promise<PostedMessage>;
   };
   deferReply(options: { flags: MessageFlags.Ephemeral }): Promise<unknown>;
@@ -74,6 +76,7 @@ export async function handleTranslateMessage(
       targetMessage.reply({
         ...buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
         allowedMentions: { repliedUser: false },
+        ...postOptionsFor(targetMessage.channel),
       }),
   });
   await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));

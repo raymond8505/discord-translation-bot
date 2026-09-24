@@ -38,6 +38,9 @@ function makeReply(
 }
 
 export interface ChatInputOptions {
+  /** Post into a thread, where a translation lands without notifying its followers. */
+  inThread?: boolean;
+
   text?: string;
   target?: string | null;
   source?: string | null;
@@ -64,7 +67,9 @@ export function makeChatInputInteraction(
     user: { id: options.userId ?? USER_ID },
     guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     options: { getString: (name) => values[name] ?? null },
-    channel: options.withoutChannel ? null : { id: CHANNEL_ID, send: makeSend(calls) },
+    channel: options.withoutChannel
+      ? null
+      : { id: CHANNEL_ID, send: makeSend(calls), isThread: () => options.inThread ?? false },
     async deferReply(payload) {
       calls.push({ method: "deferReply", payload });
     },
@@ -104,6 +109,9 @@ export function makeHelpInteraction(locale = "en-US"): HelpInteraction & Respons
 }
 
 export interface MessageContextOptions {
+  /** Post into a thread, where a translation lands without notifying its followers. */
+  inThread?: boolean;
+
   id?: string;
   content?: string;
   locale?: string;
@@ -123,6 +131,7 @@ export function makeMessageContextInteraction(
     targetMessage: {
       id: options.id ?? MESSAGE_ID,
       content: options.content ?? SPANISH_TEXT,
+      channel: { isThread: () => options.inThread ?? false },
       reply: makeReply(calls),
     },
     async deferReply(payload) {
@@ -135,6 +144,9 @@ export function makeMessageContextInteraction(
 }
 
 export interface SelectOptions {
+  /** Post into a thread, where a translation lands without notifying its followers. */
+  inThread?: boolean;
+
   customId: string;
   value?: string;
   /** What `channel.messages.fetch` returns; `null` models a deleted message (fetch throws). */
@@ -159,6 +171,7 @@ export function makeSelectInteraction(options: SelectOptions): LanguageSelectInt
     channel: options.withoutChannel
       ? null
       : {
+          isThread: () => options.inThread ?? false,
           messages: {
             async fetch(id) {
               calls.push({ method: "fetch", payload: id });
@@ -197,4 +210,9 @@ export function lastPostPayload(log: ResponseLog): ReplyPayload | undefined {
 
 export function lastPostDescription(log: ResponseLog): string | undefined {
   return lastPostPayload(log)?.embeds[0]?.toJSON().description;
+}
+
+/** The flags on the last public post; `SuppressNotifications` when it went to a thread. */
+export function lastPostFlags(log: ResponseLog): number | undefined {
+  return (lastPostPayload(log) as (ReplyPayload & { flags?: number }) | undefined)?.flags;
 }

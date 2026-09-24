@@ -9,6 +9,9 @@ import { makePostedMessages } from "./post.fixture.js";
 export const BOT_USER_ID = "999999999999999999";
 
 export interface MentionMessageOptions {
+  /** Post into a thread, where a translation lands without notifying its followers. */
+  inThread?: boolean;
+
   /** The tagging message's content; defaults to a bare mention of the bot. */
   content?: string;
   authorIsBot?: boolean;
@@ -49,6 +52,7 @@ export function makeMentionMessage(options: MentionMessageOptions = {}): FakeMen
     guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     guild: { preferredLocale: options.preferredLocale ?? "en-US" },
     reference: parent ? { messageId: parent.id } : null,
+    channel: { isThread: () => options.inThread ?? false },
     mentions: {
       has: (userId, opts) => {
         if (opts) hasOptions.push(opts);

@@ -11,7 +11,8 @@
 | Language select menus | `src/components/languageSelect.ts` | **public** `channel.send`, a new post per pick |
 | `/tb-help` (supported languages and their codes) | `src/commands/help.ts` | ephemeral — not a translation |
 
-Every translation goes out through `publishTranslation()` (`src/publish.ts`), which posts it and
+Every translation is public, and one posted **into a thread is silent** (see below). Every one
+goes out through `publishTranslation()` (`src/publish.ts`), which posts it and
 records `{channelId, messageId, target, source}` under the source message's id so an edit can find
 it again — see [translation.md](translation.md). An interaction still defers and answers
 ephemerally, but that answer is the `reply.posted` acknowledgement or a refusal; the translation
@@ -40,6 +41,31 @@ Add a new command by exporting its builder from `src/commands/`, appending it to
 - **Every string goes through `ctx.i18n.forLocale(interaction.locale)`** (guild locale on the mention
   trigger); language names and hint parsing take `tr.language`. See [i18n.md](i18n.md).
 - **Every trigger that can reach the backend checks `ctx.rateLimiter` first** — see below.
+
+## Posts into a thread are silent
+
+Every public post goes out with `...postOptionsFor(channel)` (`src/threads.ts`), which adds
+`flags: MessageFlags.SuppressNotifications` when the channel `isThread()` and nothing otherwise.
+
+A thread has **followers**, not just readers: everyone who joined or spoke in it is notified of
+every message, and a busy thread can produce a translation per message. The translation still has
+to be public — it is for whoever could not read the original — but it is an echo of something those
+people were already notified about once. The flag is exactly that distinction: the message is in
+the channel and in history for everyone, and fires no push notification or unread ping. Outside a
+thread a channel's members are not subscribed that way, so the post stays ordinary; silencing it
+there would hide translations from the people who asked for them.
+
+A channel the bot cannot see (uncached, absent on a partial) counts as **not** a thread — how these
+posts have always behaved, and the safe guess: silencing a post nobody asked to be quiet is worse.
+
+All five post sites spread it, and each has a test that would fail if its site were missed:
+`/translate` and the select menu on `channel.send`, the context menu on `targetMessage.reply`, and
+the mention and reaction triggers through their `replyQuietly()`. The structural slices carry
+`isThread()` (`PostChannel`), which the router proves the real discord.js channel satisfies.
+
+**Not applied to:** ephemeral interaction replies and the DM refusals (neither notifies a channel),
+and the edit refresh (`src/messages.ts`) — an edit fires no notification, and a post edited later
+keeps the flag it was created with.
 
 ## Refusals are private, translations are public
 
