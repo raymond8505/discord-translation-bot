@@ -82,10 +82,17 @@ The DM is worded in the **guild's** preferred locale, not the recipient's. Disco
 locale only on interactions — `User` carries none — so neither trigger can know it.
 
 A flag with no language gets `buildUnsupportedFlagReply()` (`src/reply.ts`): the flag that failed,
-every flag that would have worked with its language name, and a line pointing at the server admin.
-It carries **no menus**, because a pick made inside a DM would post the translation into that DM
-instead of the channel the reaction happened in. Languages come from `menuLanguages()` and flags from
-`flagForLanguage()` (`src/flags.ts`), so the list can never name a language the backend did not load.
+every language on offer with **every** flag that asks for it, and a line pointing at the server
+admin. It carries **no menus**, because a pick made inside a DM would post the translation into that
+DM instead of the channel the reaction happened in.
+
+Languages come from `menuLanguages()` and flags from `flagsForLanguage()` (`src/flags.ts`), so the
+list can never name a language the backend did not load. All the flags and not just the first:
+showing only 🇬🇧 for English reads as a statement that 🇺🇸 and 🇦🇺 do not work. Subdivision flags
+(England, Scotland, Wales) are left out — they are tag sequences many clients draw as a bare black
+flag, so listing one advertises a broken-looking glyph; they still resolve fine as reactions. The
+whole 29-language list renders to ~740 chars against the 4096 embed cap, and a typical
+`LT_LOAD_ONLY` install shows far fewer.
 
 ## Rate limiting
 

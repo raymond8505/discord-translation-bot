@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exampleSharedFlags, flagForLanguage, flagForRegion, isFlagEmoji, languageForFlag, regionForFlag } from "./flags.js";
+import { exampleSharedFlags, flagsForLanguage, flagForRegion, isFlagEmoji, languageForFlag, regionForFlag } from "./flags.js";
 import { libreLanguageCodes, makeSupported, primaryOnlyCodes } from "./fixtures/languages.fixture.js";
 import { FLAGS, NON_FLAGS } from "./fixtures/reaction.fixture.js";
 
@@ -62,17 +62,32 @@ describe("languageForFlag", () => {
     expect(languageForFlag(NON_FLAGS.thumbsUp, supported)).toBeNull();
   });
 
-  it("names a flag for each language, inverting the table", () => {
-    expect(flagForLanguage("de", supported)).toBe(FLAGS.germany);
-    expect(flagForLanguage("ja", supported)).toBe(FLAGS.japan);
-    // First region in table order wins, so the pairing never drifts.
-    expect(flagForLanguage("pt-BR", supported)).toBe(FLAGS.brazil);
+  it("names every flag that asks for a language, in table order", () => {
+    // Not just the first: someone deciding what to react with needs to know
+    // their own country's flag works.
+    expect(flagsForLanguage("en", supported)).toEqual([
+      FLAGS.uk,
+      FLAGS.usa,
+      FLAGS.canada,
+      FLAGS.australia,
+      FLAGS.newZealand,
+      FLAGS.ireland,
+      FLAGS.southAfrica,
+    ]);
+    expect(flagsForLanguage("ja", supported)).toEqual([FLAGS.japan]);
+    expect(flagsForLanguage("pt-BR", supported)).toEqual([FLAGS.brazil]);
+  });
+
+  it("leaves out subdivision flags, which many clients cannot draw", () => {
+    // They still resolve as reactions; they are just not worth recommending.
+    expect(languageForFlag(FLAGS.england, supported)).toBe("en");
+    expect(flagsForLanguage("en", supported)).not.toContain(FLAGS.england);
   });
 
   it("has no flag for a language the backend does not serve", () => {
     // Croatian is in the table but unloaded here, so nothing resolves to it.
-    expect(flagForLanguage("hr", supported)).toBeNull();
-    expect(flagForLanguage("klingon", supported)).toBeNull();
+    expect(flagsForLanguage("hr", supported)).toEqual([]);
+    expect(flagsForLanguage("klingon", supported)).toEqual([]);
   });
 
 });

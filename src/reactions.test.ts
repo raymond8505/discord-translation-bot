@@ -113,8 +113,13 @@ describe("handleFlagReaction", () => {
     expect(ctx.backend.translateCalls).toEqual([]);
     const dm = lastDmDescription(user);
     expect(dm).toContain(FLAGS.cambodia);
-    // A flag that does work, its language, and who to ask for the one that doesn't.
-    expect(dm).toContain(`${FLAGS.germany} German`);
+    // Every flag that works, not just the first: someone deciding what to react
+    // with needs to know their own country's flag is one of them.
+    expect(dm).toContain(
+      [FLAGS.uk, FLAGS.usa, FLAGS.canada, FLAGS.australia, FLAGS.newZealand, FLAGS.ireland, FLAGS.southAfrica]
+        .join(" ") + " English",
+    );
+    expect(dm).toContain(`${FLAGS.japan} Japanese`);
     expect(dm).toMatch(/server admin/);
     // No menus: a pick made in a DM would post the translation into the DM.
     expect(user.dms[0]?.components).toEqual([]);

@@ -138,17 +138,24 @@ export function exampleSharedFlags(limit = 4): string {
 }
 
 /**
- * A flag that asks for this backend code, for showing someone which languages
- * are on offer. Two-letter regions only: a subdivision flag renders as a bare
- * fallback on many clients, and every language here has a country that names
- * it. The first region in table order wins, so the pairing is stable.
+ * Every flag that asks for this backend code, in table order, for showing
+ * someone which languages are on offer. All of them and not just one: a reader
+ * deciding what to react with needs to know their own country's flag works,
+ * and being shown only 🇬🇧 for English reads as a statement that 🇺🇸 and 🇦🇺
+ * do not.
+ *
+ * Two-letter regions only. A subdivision flag (England, Scotland, Wales) is a
+ * tag sequence many clients draw as a bare black flag, so listing one
+ * advertises a broken-looking glyph; it still *works* as a reaction, it is
+ * just not worth recommending.
  */
-export function flagForLanguage(code: string, supported: ReadonlySet<string>): string | null {
+export function flagsForLanguage(code: string, supported: ReadonlySet<string>): string[] {
+  const flags: string[] = [];
   for (const [region, tableCode] of Object.entries(FLAG_LANGUAGES)) {
     if (region.length !== 2) continue;
-    if (resolveLanguageCode(tableCode, supported) === code) return flagForRegion(region);
+    if (resolveLanguageCode(tableCode, supported) === code) flags.push(flagForRegion(region));
   }
-  return null;
+  return flags;
 }
 
 /** True for any country or subdivision flag, whether or not it names a language. */

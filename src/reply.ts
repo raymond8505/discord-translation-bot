@@ -10,7 +10,7 @@ import {
   buildSelectCustomId,
   type SelectRole,
 } from "./components/customId.js";
-import { flagForLanguage } from "./flags.js";
+import { flagsForLanguage } from "./flags.js";
 import type { Translator } from "./i18n/index.js";
 import { labelFor, menuLanguages, type MenuLanguage } from "./locale.js";
 
@@ -138,14 +138,16 @@ export interface UnsupportedFlagInput {
  *
  * Languages come from `menuLanguages()`, so the names are in the same language
  * and the same order as the menus everywhere else, and a language the backend
- * did not load cannot appear. One without a country flag in the table is
- * listed by name alone rather than dropped — it is still translatable.
+ * did not load cannot appear. Each is listed with *every* flag that asks for
+ * it, because the reader wants to know whether their own country's flag works.
+ * One with no country flag at all is listed by name alone rather than
+ * dropped — it is still translatable, just not by reacting.
  */
 export function buildUnsupportedFlagReply(input: UnsupportedFlagInput): ReplyPayload {
   const { flag, supported, tr } = input;
   const lines = menuLanguages(supported, tr.language).map((language) => {
-    const emoji = flagForLanguage(language.code, supported);
-    return emoji ? `${emoji} ${language.label}` : language.label;
+    const flags = flagsForLanguage(language.code, supported);
+    return flags.length > 0 ? `${flags.join(" ")} ${language.label}` : language.label;
   });
 
   // Glue lives in code; only the sentences are translated.
