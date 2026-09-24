@@ -76,25 +76,50 @@ Full English sentences score 100, so 25 still leaves real doubt flagged. A failu
 
 ## Cache
 
-`src/cache.ts` over a structural `RedisLike` (get / set with `EX` / del / `scanIterator` yielding
-`string[]` batches — node-redis ≥ 5 semantics).
+`src/cache.ts` over a structural `RedisLike` (get / set with `EX` / del).
+
+**Two keyings, on purpose.** A translation is keyed by *what was said*; the stored source text and
+the post registry by *where it was said*. A string reposted in ten messages is one entry and one
+backend call, while edit-follow and the re-translate menu still have a per-message handle.
 
 | Key | Value | TTL |
 | --- | --- | --- |
-| `tr:{sourceId}:{target}` | JSON `{ text, backend, source_lang, created_at, confidence? }` | `CACHE_TTL_SECONDS` |
+| `tr:{contentHash}:{source}:{target}` | JSON `{ text, backend, source_lang, created_at, confidence? }` | `CACHE_TTL_SECONDS` |
 | `src:{sourceId}` | original text (for the re-translate menu, and to tell a real edit from an unfurl) | same |
 | `post:{sourceId}` | JSON `[{ channelId, messageId, target, source }]` — every translation the bot posted about that message (`src/posts.ts`) | same, re-set on each post |
 
+`contentHash` (`src/sourceId.ts`) is sha256 of the NFC-normalised text, hex-truncated to 32 chars,
+taken **after** the `MAX_INPUT_CHARS` truncation — 128 bits, because a collision here serves one
+person's translation to another for a whole TTL. `sourceIdForText` slices the same digest to 16 for
+its `t_…` id, which is squeezed by the 100-char customId limit. `{source}` is the **requested**
+source (`auto` or a forced code), never the detected one, so a correction and a detection never read
+each other's entry. The backend name is deliberately **not** in the key: a hit is served whoever
+wrote it, as it always was. `sourceId` (snowflake, or `t_…` for free text) is no longer part of it.
+
 `translateWithCache()` (`src/translate.ts`) is cache-first; every cache call is wrapped so a Redis
-outage logs and degrades to uncached — it never fails a reply. Corrupt entries read as misses. A
-forced `source` skips the read and overwrites the entry.
+outage logs and degrades to uncached — it never fails a reply. Corrupt entries read as misses.
+
+A forced `source` **reads** its own key — the source is pinned, so the stored entry is exactly the
+one asked for — and on a miss writes **both** `tr:{hash}:{forced}:{target}` and
+`tr:{hash}:auto:{target}`: the user is correcting a wrong detection, and the correction should be
+what everyone gets from then on. That was always the intent; only the mechanism changed.
+
+A cache **hit** still writes `src:{sourceId}`. It used to fall out of the miss path, but a hit can
+now belong to a different message, and without it this message would lose its re-translate menu and
+its edit detection purely because someone else had said the same thing first. A backend failure
+still stores nothing.
+
+Keys written under the old `tr:{sourceId}:{target}` shape are unreachable and expire on their TTL.
+There is no migration.
 
 ## Invalidation and edit-follow
 
-`src/invalidation.ts` handles `messageUpdate` and `messageDelete`. `cache.invalidate(id)` is
-`SCAN MATCH tr:{id}:*` + `DEL` in batches, then `DEL src:{id}`. Never `KEYS`; never `DEL` with an
-empty list (the server rejects it — the fake throws to keep the guard honest). `post:{id}` is
-deliberately **not** in that sweep: the registry has to survive the edit that triggers the refresh.
+`src/invalidation.ts` handles `messageUpdate` and `messageDelete`. `cache.invalidate(id)` is now just
+`DEL src:{id}` — never with an empty list (the server rejects it; the fake throws to keep the guard
+honest). **Translations need no sweep and cannot be swept:** they are content-keyed, so edited text
+hashes to a different key and the old entry is never looked up again. It lingers, unreachable, until
+its TTL, which is cheaper than keeping a message-to-hash index alive purely to delete from it.
+`post:{id}` is likewise untouched: the registry has to survive the edit that triggers the refresh.
 A delete drops it explicitly, via `posts.drop(id)`.
 
 An edit then rewrites what is already in the channel, because a translation presented as a reading
@@ -106,9 +131,12 @@ of a message that now says something else is worse than none:
 3. **The new text is compared against `src:{id}`.** Equal means nothing really changed, and nothing
    is touched. This is what keeps every unfurl on pre-boot history — which reaches step 2 with no
    old content to rule it out — from costing a backend call per post.
-4. `cache.invalidate(id)`, then `posts.list(id)`. No posts, or no text left in the message, and the
-   refresh ends; the posts already in the channel stay as they are, there being no text to put in them.
+4. `cache.invalidate(id)` (the stored source only), then `posts.list(id)`. No posts, or no text left
+   in the message, and the refresh ends; the posts already in the channel stay as they are, there
+   being no text to put in them.
 5. Per post: a guild-only rate-limit check, `translateWithCache()` for that post's own `target` and
-   `source` (a forced source stays forced), and `ctx.messages.edit()` (`src/messages.ts`, the only
+   `source` (a forced source stays forced — and since every ref re-translates the same new text, two
+   refs sharing a target collide in the content-keyed cache, a forced ref's auto-mirror feeding an
+   auto ref its correction; that is the correction winning, as intended), and `ctx.messages.edit()` (`src/messages.ts`, the only
    Discord write outside a handler). `gone` — the post or channel is deleted, or access is lost —
    prunes it with `posts.forget()`. One post failing never costs the others theirs.

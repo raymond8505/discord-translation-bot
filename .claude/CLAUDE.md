@@ -26,7 +26,9 @@ arrays. `tsconfig.build.json` excludes them from the image.
 acknowledgement or a refusal; **every translation is a public channel message**, posted and recorded
 through `publishTranslation()` so an edit to the source can come back and rewrite it.
 
-**Redis: `SCAN`, never `KEYS`; guard empty `DEL`s** — the fake in `redis.fixture.ts` enforces both.
+**Redis: guard empty `DEL`s** — the fake in `redis.fixture.ts` throws on one, as the server does.
+No keyspace sweep exists today (the cache is content-keyed, so nothing needs one); if one is ever
+needed, `SCAN`, never `KEYS`.
 
 **No user-facing string literals in `src/`**: every reply, embed, placeholder and command description
 is a key in `src/i18n/messages/en.json` rendered through a `Translator` (`ctx.i18n.forLocale(...)`).

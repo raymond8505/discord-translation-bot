@@ -16,7 +16,7 @@ image.
 | `env.fixture.ts` | `validEnvSource` / `makeEnvSource()` (raw strings), `validEnv` / `makeEnv()` (parsed) |
 | `languages.fixture.ts` | `libreLanguageCodes` (realistic `/languages` set incl. `zt`/`nb`/`pb`, no `hr`/`lt`), `primaryOnlyCodes`, `makeSupported()` |
 | `libretranslate.fixture.ts` | response payloads, `makeJsonResponse()`, `makeFetch()` (records calls), `makeHangingFetch()` (drives the real timeout path) |
-| `redis.fixture.ts` | `makeFakeRedis()` — in-memory `RedisLike` + `RateLimitRedis`; SCAN yields an empty page first then `COUNT`-sized pages; `del([])` throws; `incr` returns the new value so "1 means first in the window" holds; `expireCalls` records TTLs. `makeFailingRedis()` rejects every command, `makeHangingRedis()` never settles |
+| `redis.fixture.ts` | `makeFakeRedis()` — in-memory `RedisLike` + `RateLimitRedis`; `del([])` throws; `incr` returns the new value so "1 means first in the window" holds; `expireCalls` records TTLs. `makeFailingRedis()` rejects every command, `makeHangingRedis()` never settles |
 | `cache.fixture.ts` | `cacheEntry` / `makeCacheEntry()` |
 | `backend.fixture.ts` | `makeFakeBackend()` — records `translateCalls`, default echo translation `[target] text` |
 | `context.fixture.ts` | `makeContext()` — full `AppContext` over the fakes, `makeRecordingLogger()`, and `alwaysLimited(scope, retryAfter)` for a handler's over-limit branch (pass as `rateLimiter`) |
@@ -36,8 +36,13 @@ image.
   `row.toJSON().components[0].options`).
 - Fake timers: `vi.useFakeTimers()` + `await vi.advanceTimersByTimeAsync()`; restore in
   `afterEach`. The heartbeat test writes under `os.tmpdir()`.
-- A cache hit in one step of a multi-step test hides a backend call in the next — vary the target
-  (the router test does) rather than clearing the fake.
+- **A cache hit in one step of a multi-step test hides a backend call in the next** — vary the target
+  (the router test does) rather than clearing the fake. The translation cache is **content-keyed**,
+  so two steps collide whenever `(text, requested source, target)` match: a different message id no
+  longer separates them, and most handler tests reuse one fixture text. The corollary that is easy to
+  miss: a **forced-source step also fills the `auto` entry** for that text and target, so an auto step
+  after a forced one on the same pair is a hit. `commands/translate.test.ts` carries a comment saying
+  why its four steps must all use different targets.
 - **The default `makeContext()` carries a real limiter over the fake Redis**, so a test that drives
   one handler many times can exhaust a budget and start getting refusals instead of translations.
   Reach for `alwaysLimited()` to assert the over-limit branch; for everything else keep the run
