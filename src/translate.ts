@@ -1,5 +1,6 @@
 import type { CacheEntry } from "./cache.js";
 import type { AppContext } from "./context.js";
+import { contentHash } from "./sourceId.js";
 
 /** Discord messages cap at 4000 chars (Nitro); anything longer is not a real message. */
 export const MAX_INPUT_CHARS = 4000;
@@ -7,6 +8,11 @@ export const MAX_INPUT_CHARS = 4000;
 export const AUTO_SOURCE = "auto";
 
 export interface TranslateInput {
+  /**
+   * Identity of the *message*, for the stored source text (edit detection, the
+   * re-translate menu). Not part of the translation key — translations are
+   * keyed by content, so two messages saying the same thing share one.
+   */
   readonly sourceId: string;
   readonly text: string;
   readonly target: string;
@@ -29,9 +35,11 @@ type TranslateContext = Pick<AppContext, "backend" | "cache" | "log">;
  * (or skipped writes): a cache outage costs backend calls, never a failed
  * reply. Backend failures propagate as `BackendError` for the caller to word.
  *
- * A forced source skips the cache read and overwrites the entry: the user is
- * correcting a wrong detection, and the correction should be what everyone
- * gets from then on.
+ * The entry is keyed by the text, so a string reposted across ten messages is
+ * translated once. A forced source is safe to read back — the source is pinned,
+ * so the stored entry is exactly the one asked for — and on a miss it is also
+ * written to the `auto` key: the user is correcting a wrong detection, and the
+ * correction should be what everyone gets from then on.
  */
 export async function translateWithCache(
   ctx: TranslateContext,
@@ -41,12 +49,18 @@ export async function translateWithCache(
   const { sourceId, target } = input;
   const source = input.source ?? AUTO_SOURCE;
   const forced = source !== AUTO_SOURCE;
+  // Over the truncated text: `commands/translate.ts` hashes the untruncated
+  // text for its source id, but that lives in its own `t_` namespace, and the
+  // source text stored below is the truncated one the menu re-translates.
+  const hash = contentHash(text);
 
-  if (!forced) {
-    const hit = await safe(ctx, "get", () => ctx.cache.get(sourceId, target));
-    if (hit) {
-      return { entry: hit, target, cached: true, sameLanguage: hit.source_lang === target };
-    }
+  const hit = await safe(ctx, "get", () => ctx.cache.get(hash, source, target));
+  if (hit) {
+    // The entry is shared between messages, but the source text belongs to this
+    // one: without it this message has no re-translate menu and no edit
+    // detection, purely because someone else had said the same thing first.
+    await safe(ctx, "setSource", () => ctx.cache.setSource(sourceId, text));
+    return { entry: hit, target, cached: true, sameLanguage: hit.source_lang === target };
   }
 
   const result = await ctx.backend.translate(text, source, target);
@@ -58,7 +72,9 @@ export async function translateWithCache(
     ...(forced || result.confidence === undefined ? {} : { confidence: result.confidence }),
   };
 
-  await safe(ctx, "set", () => ctx.cache.set(sourceId, target, entry));
+  await safe(ctx, "set", () => ctx.cache.set(hash, source, target, entry));
+  // The correction becomes the answer for everyone who asks about this text.
+  if (forced) await safe(ctx, "set auto", () => ctx.cache.set(hash, AUTO_SOURCE, target, entry));
   await safe(ctx, "setSource", () => ctx.cache.setSource(sourceId, text));
 
   return { entry, target, cached: false, sameLanguage: result.detectedSource === target };

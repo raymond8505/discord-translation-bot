@@ -76,6 +76,9 @@ export function createMessageInvalidator(ctx: InvalidationContext): MessageInval
     const supported = await ctx.languages.get();
     const text = message.content ?? "";
 
+    // Every ref re-translates the same new text, so two refs sharing a target
+    // collide in the content-keyed cache — and a forced ref's auto-mirror feeds
+    // an auto ref its correction. That is the correction winning, as intended.
     for (const ref of refs) {
       // No user asked for this, so only the guild's hourly budget sees it. A
       // refusal stops the whole refresh: every remaining post faces the same

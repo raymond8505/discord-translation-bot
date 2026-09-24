@@ -60,7 +60,8 @@ describe("createInteractionHandler", () => {
     const handle = createInteractionHandler(ctx);
     const chat = makeChatInputInteraction({ text: "hola" });
     const context = makeMessageContextInteraction();
-    // "de" so the select misses the cache the context command just filled for "fr".
+    // "de" so the select misses the entry the context command filled for "fr".
+    // The cache is keyed by content, so a differing message id would not miss.
     const select = makeSelectInteraction({
       customId: buildSelectCustomId({ role: "target", menuIndex: 0, other: "auto", sourceId: MESSAGE_ID }),
       value: "de",

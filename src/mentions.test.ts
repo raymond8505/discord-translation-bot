@@ -42,6 +42,8 @@ describe("handleMentionMessage", () => {
   it("forces the source with the source:target form", async () => {
     const ctx = makeContext();
 
+    // Three distinct (source, target) pairs over one text: the content-keyed
+    // cache would serve a repeat rather than let it reach the fake backend.
     await handleMentionMessage(ctx, makeMentionMessage({ content: `<@${BOT_USER_ID}> fr:en` }));
     await handleMentionMessage(ctx, makeMentionMessage({ content: `<@${BOT_USER_ID}> fr:`, preferredLocale: "de" }));
     await handleMentionMessage(ctx, makeMentionMessage({ content: `<@${BOT_USER_ID}> :ja` }));

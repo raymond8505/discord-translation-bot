@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sourceKey, translationKey } from "./cache.js";
+import { makeCacheEntry } from "./fixtures/cache.fixture.js";
 import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
 import { MESSAGE_ID } from "./fixtures/interaction.fixture.js";
 import { makeEditedMessage } from "./fixtures/invalidation.fixture.js";
@@ -8,11 +9,11 @@ import { makePostRef, POSTED_MESSAGE_ID } from "./fixtures/post.fixture.js";
 import { makeFakeRedis } from "./fixtures/redis.fixture.js";
 import { createMessageInvalidator, shouldInvalidateOnUpdate } from "./invalidation.js";
 import { postsKey } from "./posts.js";
+import { contentHash } from "./sourceId.js";
 
 const full = (content: string | null) => makeEditedMessage({ content });
 const partial = () => makeEditedMessage({ partial: true });
 
-const OTHER_MESSAGE_ID = "222222222222222222";
 const OTHER_POST_ID = "456789012345678999";
 
 describe("shouldInvalidateOnUpdate", () => {
@@ -29,9 +30,10 @@ describe("shouldInvalidateOnUpdate", () => {
 describe("createMessageInvalidator", () => {
   function seeded(extra: Record<string, string> = {}) {
     return makeFakeRedis({
-      [translationKey(MESSAGE_ID, "en")]: "{}",
+      [translationKey(contentHash("hola"), "auto", "fr")]: JSON.stringify(
+        makeCacheEntry({ text: "[fr] STALE" }),
+      ),
       [sourceKey(MESSAGE_ID)]: "hola",
-      [translationKey(OTHER_MESSAGE_ID, "en")]: "{}",
       ...extra,
     });
   }
@@ -44,16 +46,27 @@ describe("createMessageInvalidator", () => {
     return seeded({ [postsKey(MESSAGE_ID)]: JSON.stringify(refs) });
   }
 
-  it("drops a message's keys on a real edit and on delete", async () => {
+  it("drops the stored source on a real edit and on delete", async () => {
     const edited = makeContext({ redis: seeded() });
     await createMessageInvalidator(edited).onUpdate(full("a"), full("b"));
-    expect(edited.redis.store.has(translationKey(MESSAGE_ID, "en"))).toBe(false);
     expect(edited.redis.store.has(sourceKey(MESSAGE_ID))).toBe(false);
-    expect(edited.redis.store.has(translationKey(OTHER_MESSAGE_ID, "en"))).toBe(true);
+    // Translations are content-keyed, so the edit cannot strand one: the new
+    // text hashes elsewhere and this entry is simply never read again.
+    expect(edited.redis.store.has(translationKey(contentHash("hola"), "auto", "fr"))).toBe(true);
 
     const deleted = makeContext({ redis: seeded() });
     await createMessageInvalidator(deleted).onDelete(partial());
-    expect(deleted.redis.store.has(translationKey(MESSAGE_ID, "en"))).toBe(false);
+    expect(deleted.redis.store.has(sourceKey(MESSAGE_ID))).toBe(false);
+  });
+
+  it("re-translates an edit rather than serving the entry the old text left behind", async () => {
+    const ctx = makeContext({ redis: withPosts("fr") });
+
+    await createMessageInvalidator(ctx).onUpdate(full("hola"), full("adios"));
+
+    expect(ctx.backend.translateCalls).toEqual([{ text: "adios", source: "auto", target: "fr" }]);
+    expect(ctx.messages.edits[0]?.payload.embeds[0]?.toJSON().description).toContain("[fr] adios");
+    expect(ctx.redis.store.has(translationKey(contentHash("hola"), "auto", "fr"))).toBe(true);
   });
 
   it("forgets what it posted about a deleted message", async () => {
@@ -142,7 +155,7 @@ describe("createMessageInvalidator", () => {
 
     await createMessageInvalidator(ctx).onUpdate(full("hola"), full("adios"));
 
-    expect(ctx.redis.store.has(translationKey(MESSAGE_ID, "en"))).toBe(false);
+    expect(ctx.redis.store.has(sourceKey(MESSAGE_ID))).toBe(false);
     expect(ctx.backend.translateCalls).toEqual([]);
     expect(ctx.messages.edits).toEqual([]);
   });

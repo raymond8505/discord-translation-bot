@@ -11,6 +11,7 @@ import {
   makeMessageContextInteraction,
 } from "../fixtures/interaction.fixture.js";
 import { frenchMessages } from "../fixtures/messages.fixture.js";
+import { contentHash } from "../sourceId.js";
 import { handleTranslateMessage, translateMessageCommand } from "./translateMessage.js";
 
 describe("translateMessageCommand", () => {
@@ -43,12 +44,12 @@ describe("handleTranslateMessage", () => {
     await expect(ctx.posts.list(MESSAGE_ID)).resolves.toMatchObject([{ target: "fr", source: "auto" }]);
   });
 
-  it("caches under the message id so edits and deletes can invalidate it", async () => {
+  it("caches the translation by content and the source text by message id", async () => {
     const ctx = makeContext();
 
     await handleTranslateMessage(ctx, makeMessageContextInteraction({ id: MESSAGE_ID, locale: "de" }));
 
-    expect(ctx.redis.store.has(translationKey(MESSAGE_ID, "de"))).toBe(true);
+    expect(ctx.redis.store.has(translationKey(contentHash(SPANISH_TEXT), "auto", "de"))).toBe(true);
     expect(ctx.redis.store.get(sourceKey(MESSAGE_ID))?.value).toBe(SPANISH_TEXT);
   });
 

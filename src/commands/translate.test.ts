@@ -10,7 +10,7 @@ import {
   makeChatInputInteraction,
 } from "../fixtures/interaction.fixture.js";
 import { frenchMessages } from "../fixtures/messages.fixture.js";
-import { sourceIdForText } from "../sourceId.js";
+import { contentHash } from "../sourceId.js";
 import { handleTranslate, handleTranslateAutocomplete, translateCommand } from "./translate.js";
 
 describe("translateCommand", () => {
@@ -43,7 +43,7 @@ describe("handleTranslate", () => {
     expect(lastPostDescription(interaction)).toBe("[en] hola");
     expect(lastReplyDescription(interaction)).toBe("Posted the translation in the channel.");
     expect(ctx.backend.translateCalls).toEqual([{ text: "hola", source: "auto", target: "en" }]);
-    expect(ctx.redis.store.has(translationKey(sourceIdForText("hola"), "en"))).toBe(true);
+    expect(ctx.redis.store.has(translationKey(contentHash("hola"), "auto", "en"))).toBe(true);
     expect(lastPostPayload(interaction)?.components.length).toBeGreaterThan(0);
   });
 
@@ -78,16 +78,19 @@ describe("handleTranslate", () => {
   it("forces the source from the source option or a source:target in target", async () => {
     const ctx = makeContext();
 
+    // All four steps translate the same default text over one ctx, so their
+    // targets must differ: the cache is keyed by content, and a repeat of a
+    // (source, target) pair would be served from it and never reach the fake.
     await handleTranslate(ctx, makeChatInputInteraction({ source: "french" }));
     await handleTranslate(ctx, makeChatInputInteraction({ target: "fr:de" }));
     await handleTranslate(ctx, makeChatInputInteraction({ target: "fr:", locale: "ja" }));
-    await handleTranslate(ctx, makeChatInputInteraction({ target: "es:de", source: "fr" }));
+    await handleTranslate(ctx, makeChatInputInteraction({ target: "es:it", source: "fr" }));
 
     expect(ctx.backend.translateCalls.map((c) => [c.source, c.target])).toEqual([
       ["fr", "en"],
       ["fr", "de"],
       ["fr", "ja"],
-      ["fr", "de"],
+      ["fr", "it"],
     ]);
   });
 

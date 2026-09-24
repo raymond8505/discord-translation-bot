@@ -3,9 +3,11 @@ import { createCache, sourceKey, translationKey } from "./cache.js";
 import { makeCacheEntry } from "./fixtures/cache.fixture.js";
 import { makeFakeRedis } from "./fixtures/redis.fixture.js";
 import type { Logger } from "./log.js";
+import { contentHash } from "./sourceId.js";
 
 const TTL = 3600;
 const MESSAGE_ID = "111111111111111111";
+const HASH = contentHash("hola");
 
 function makeLogger(): Logger {
   return { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
@@ -17,29 +19,41 @@ describe("createCache", () => {
     const cache = createCache(redis, TTL);
     const entry = makeCacheEntry();
 
-    await cache.set(MESSAGE_ID, "en", entry);
+    await cache.set(HASH, "auto", "en", entry);
 
-    const record = redis.store.get(translationKey(MESSAGE_ID, "en"));
+    const record = redis.store.get(translationKey(HASH, "auto", "en"));
     expect(record?.ex).toBe(TTL);
     expect(JSON.parse(record?.value ?? "")).toEqual(entry);
-    await expect(cache.get(MESSAGE_ID, "en")).resolves.toEqual(entry);
+    await expect(cache.get(HASH, "auto", "en")).resolves.toEqual(entry);
   });
 
   it("returns null on a miss", async () => {
     const cache = createCache(makeFakeRedis(), TTL);
-    await expect(cache.get(MESSAGE_ID, "en")).resolves.toBeNull();
+    await expect(cache.get(HASH, "auto", "en")).resolves.toBeNull();
+  });
+
+  it("keeps the requested source in the key, so a forced source never reads an auto entry", async () => {
+    const redis = makeFakeRedis();
+    const cache = createCache(redis, TTL);
+
+    await cache.set(HASH, "auto", "en", makeCacheEntry({ text: "detected" }));
+    await cache.set(HASH, "fr", "en", makeCacheEntry({ text: "forced" }));
+
+    await expect(cache.get(HASH, "auto", "en")).resolves.toMatchObject({ text: "detected" });
+    await expect(cache.get(HASH, "fr", "en")).resolves.toMatchObject({ text: "forced" });
+    await expect(cache.get(HASH, "de", "en")).resolves.toBeNull();
   });
 
   it("treats corrupt or mis-shaped entries as misses and warns", async () => {
     const logger = makeLogger();
     const redis = makeFakeRedis({
-      [translationKey(MESSAGE_ID, "en")]: "{not json",
-      [translationKey(MESSAGE_ID, "fr")]: JSON.stringify({ text: 1 }),
+      [translationKey(HASH, "auto", "en")]: "{not json",
+      [translationKey(HASH, "auto", "fr")]: JSON.stringify({ text: 1 }),
     });
     const cache = createCache(redis, TTL, logger);
 
-    await expect(cache.get(MESSAGE_ID, "en")).resolves.toBeNull();
-    await expect(cache.get(MESSAGE_ID, "fr")).resolves.toBeNull();
+    await expect(cache.get(HASH, "auto", "en")).resolves.toBeNull();
+    await expect(cache.get(HASH, "auto", "fr")).resolves.toBeNull();
     expect(logger.warn).toHaveBeenCalledTimes(2);
   });
 
@@ -54,23 +68,20 @@ describe("createCache", () => {
     await expect(cache.getSource("other")).resolves.toBeNull();
   });
 
-  it("invalidates every translation and the source across scan batches, leaving other messages", async () => {
+  it("invalidates the stored source only, leaving the content-keyed translations to their TTL", async () => {
     const redis = makeFakeRedis();
     const cache = createCache(redis, TTL);
-    const targets = ["en", "fr", "de", "es", "ja", "ko", "zh"];
-    for (const target of targets) await cache.set(MESSAGE_ID, target, makeCacheEntry());
+    await cache.set(HASH, "auto", "en", makeCacheEntry());
     await cache.setSource(MESSAGE_ID, "hola");
-    await cache.set("222222222222222222", "en", makeCacheEntry());
-    // Force several SCAN pages by making the fake page over the seeded keys.
-    const paged = { ...redis, scanIterator: (o: { MATCH: string; COUNT: number }) => redis.scanIterator({ ...o, COUNT: 3 }) };
 
-    const deleted = await createCache(paged, TTL).invalidate(MESSAGE_ID);
+    const deleted = await cache.invalidate(MESSAGE_ID);
 
-    expect(deleted).toBe(targets.length + 1);
-    for (const target of targets) expect(redis.store.has(translationKey(MESSAGE_ID, target))).toBe(false);
+    expect(deleted).toBe(1);
     expect(redis.store.has(sourceKey(MESSAGE_ID))).toBe(false);
-    expect(redis.store.has(translationKey("222222222222222222", "en"))).toBe(true);
-    expect(redis.delCalls.length).toBeGreaterThan(2);
+    // The entry survives on purpose: edited text hashes elsewhere, so nothing
+    // can reach this one again and it ages out rather than needing a sweep.
+    expect(redis.store.has(translationKey(HASH, "auto", "en"))).toBe(true);
+    expect(redis.delCalls).toEqual([[sourceKey(MESSAGE_ID)]]);
   });
 
   it("never issues an empty DEL and reports zero when nothing is cached", async () => {

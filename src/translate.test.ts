@@ -5,14 +5,17 @@ import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { makeCacheEntry } from "./fixtures/cache.fixture.js";
 import { makeContext } from "./fixtures/context.fixture.js";
 import { makeFakeRedis } from "./fixtures/redis.fixture.js";
+import { contentHash } from "./sourceId.js";
 import { MAX_INPUT_CHARS, translateWithCache } from "./translate.js";
 
 const ID = "123456789012345678";
+const OTHER_ID = "987654321098765432";
+const HOLA = contentHash("hola");
 
 describe("translateWithCache", () => {
   it("returns a cached entry without calling the backend", async () => {
     const entry = makeCacheEntry({ source_lang: "es" });
-    const redis = makeFakeRedis({ [translationKey(ID, "en")]: JSON.stringify(entry) });
+    const redis = makeFakeRedis({ [translationKey(HOLA, "auto", "en")]: JSON.stringify(entry) });
     const ctx = makeContext({ redis });
 
     const outcome = await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en" });
@@ -30,7 +33,7 @@ describe("translateWithCache", () => {
     expect(outcome.cached).toBe(false);
     expect(outcome.entry).toMatchObject({ text: "[en] hola", backend: "fake", source_lang: "es" });
     expect(Date.parse(outcome.entry.created_at)).not.toBeNaN();
-    expect(ctx.redis.store.get(translationKey(ID, "en"))?.ex).toBe(42);
+    expect(ctx.redis.store.get(translationKey(HOLA, "auto", "en"))?.ex).toBe(42);
     expect(ctx.redis.store.get(sourceKey(ID))).toEqual({ value: "hola", ex: 42 });
   });
 
@@ -43,12 +46,13 @@ describe("translateWithCache", () => {
     const outcome = await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en" });
 
     expect(outcome.entry.confidence).toBe(45);
-    expect(JSON.parse(ctx.redis.store.get(translationKey(ID, "en"))?.value ?? "")).toMatchObject({ confidence: 45 });
+    expect(JSON.parse(ctx.redis.store.get(translationKey(HOLA, "auto", "en"))?.value ?? "")).toMatchObject({ confidence: 45 });
   });
 
-  it("with a forced source, skips the cached entry, overwrites it, and records no confidence", async () => {
+  it("with a forced source, ignores the auto entry and writes both keys", async () => {
+    const hash = contentHash("j'adore");
     const stale = makeCacheEntry({ text: "wrong", source_lang: "es", confidence: 45 });
-    const redis = makeFakeRedis({ [translationKey(ID, "en")]: JSON.stringify(stale) });
+    const redis = makeFakeRedis({ [translationKey(hash, "auto", "en")]: JSON.stringify(stale) });
     const backend = makeFakeBackend({
       translate: async (text, source) => ({ text: `[${source}] ${text}`, detectedSource: source }),
     });
@@ -60,7 +64,60 @@ describe("translateWithCache", () => {
     expect(outcome.cached).toBe(false);
     expect(outcome.entry).toMatchObject({ text: "[fr] j'adore", source_lang: "fr" });
     expect(outcome.entry).not.toHaveProperty("confidence");
-    expect(await ctx.cache.get(ID, "en")).toMatchObject({ text: "[fr] j'adore" });
+    expect(await ctx.cache.get(hash, "fr", "en")).toMatchObject({ text: "[fr] j'adore" });
+    // The correction overwrites what detection had guessed, for everyone.
+    expect(await ctx.cache.get(hash, "auto", "en")).toMatchObject({ text: "[fr] j'adore" });
+  });
+
+  it("serves one entry to two different messages that say the same thing", async () => {
+    const ctx = makeContext();
+
+    const first = await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en" });
+    const second = await translateWithCache(ctx, { sourceId: OTHER_ID, text: "hola", target: "en" });
+
+    expect(ctx.backend.translateCalls).toHaveLength(1);
+    expect(first.cached).toBe(false);
+    expect(second).toEqual({ ...first, cached: true });
+    // The translation is shared; the stored source text is not.
+    expect(ctx.redis.store.get(sourceKey(ID))?.value).toBe("hola");
+    expect(ctx.redis.store.get(sourceKey(OTHER_ID))?.value).toBe("hola");
+  });
+
+  it("serves a forced source back from its own key", async () => {
+    const ctx = makeContext();
+
+    await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en", source: "fr" });
+    const again = await translateWithCache(ctx, { sourceId: OTHER_ID, text: "hola", target: "en", source: "fr" });
+
+    expect(ctx.backend.translateCalls).toHaveLength(1);
+    expect(again.cached).toBe(true);
+  });
+
+  it("lets a forced correction answer the next auto request for the same text", async () => {
+    const backend = makeFakeBackend({
+      translate: async (text, source) => ({ text: `[${source}] ${text}`, detectedSource: source }),
+    });
+    const ctx = makeContext({ backend });
+
+    await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en", source: "fr" });
+    const auto = await translateWithCache(ctx, { sourceId: OTHER_ID, text: "hola", target: "en" });
+
+    expect(ctx.backend.translateCalls).toHaveLength(1);
+    expect(auto).toMatchObject({ cached: true, entry: { source_lang: "fr" } });
+  });
+
+  it("keeps two forced sources for the same text apart", async () => {
+    const backend = makeFakeBackend({
+      translate: async (text, source) => ({ text: `[${source}] ${text}`, detectedSource: source }),
+    });
+    const ctx = makeContext({ backend });
+
+    await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en", source: "fr" });
+    await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en", source: "de" });
+
+    expect(ctx.backend.translateCalls.map((c) => c.source)).toEqual(["fr", "de"]);
+    expect(await ctx.cache.get(HOLA, "fr", "en")).toMatchObject({ text: "[fr] hola" });
+    expect(await ctx.cache.get(HOLA, "de", "en")).toMatchObject({ text: "[de] hola" });
   });
 
   it("flags a translation whose detected source equals the target", async () => {
