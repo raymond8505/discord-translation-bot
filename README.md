@@ -122,16 +122,9 @@ Other loops:
   `REDIS_URL` / `LT_URL`, which the compose stack deliberately does not
   expose, so the container loop above is the supported path.
 
-## Deploy (VPS)
-
-`.github/workflows/deploy.yml` runs on every PR and push to `main`: a `gitleaks`
-scan of the full history, then `yarn typecheck`/`lint`/`test:run`, then an image
-build — and on `main` only, ssh to the VPS, `git reset --hard origin/main`,
-write `.env` from repository secrets and `docker compose up -d --build`.
-
-Setting that up is a one-time job: eight repository secrets and two SSH
-keypairs. The runbook, with every command to run on the VPS, is
-**[DEPLOY.md](DEPLOY.md)**.
+Running this on a VPS is a separate, one-time setup — eight repository secrets
+and two SSH keypairs, with `.github/workflows/deploy.yml` doing the rest on
+every push to `main`. The runbook is **[DEPLOY.md](DEPLOY.md)**.
 
 ## Swapping the translation backend
 
