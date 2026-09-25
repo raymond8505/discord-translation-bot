@@ -58,7 +58,7 @@ export function buildTranslationReply(
   const confidence = entry.confidence;
   const uncertain =
     confidence !== undefined && confidence < LOW_CONFIDENCE_PERCENT;
-  const sourceLabel = labelFor(entry.source_lang, tr.language);
+  const sourceLabel = labelFor(entry.source_lang, tr.displayLanguage);
   const sourcePart =
     confidence === undefined
       ? tr.t("reply.source", { language: sourceLabel })
@@ -74,7 +74,7 @@ export function buildTranslationReply(
     .join(" · ");
 
   const embed = new EmbedBuilder()
-    .setTitle(`${tr.t("reply.title")} → ${labelFor(target, tr.language)}`)
+    .setTitle(`${tr.t("reply.title")} → ${labelFor(target, tr.displayLanguage)}`)
     .setDescription(truncate(entry.text, EMBED_DESCRIPTION_MAX))
     .setFooter({ text: footer });
   if (uncertain) {
@@ -84,7 +84,7 @@ export function buildTranslationReply(
     });
   }
 
-  const languages = menuLanguages(supported, tr.language);
+  const languages = menuLanguages(supported, tr.displayLanguage);
   if (languages.length === 0) return { embeds: [embed], components: [] };
 
   const autoOption: MenuLanguage = { code: AUTO_VALUE, label: tr.t("menu.auto") };
@@ -147,7 +147,7 @@ export interface UnsupportedFlagInput {
  */
 export function buildUnsupportedFlagReply(input: UnsupportedFlagInput): ReplyPayload {
   const { flag, supported, tr } = input;
-  const rows = menuLanguages(supported, tr.language).map((language) => ({
+  const rows = menuLanguages(supported, tr.displayLanguage).map((language) => ({
     label: language.label,
     flags: flagsForLanguage(language.code, supported).join(" "),
   }));
@@ -196,7 +196,7 @@ export interface LanguagePickerInput {
  */
 export function buildLanguagePickerReply(input: LanguagePickerInput): ReplyPayload {
   const { sourceId, supported, tr, notice } = input;
-  const languages = menuLanguages(supported, tr.language);
+  const languages = menuLanguages(supported, tr.displayLanguage);
   if (languages.length === 0) return buildNoticeReply(notice);
 
   return {

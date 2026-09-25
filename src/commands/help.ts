@@ -30,7 +30,7 @@ export async function handleHelp(ctx: AppContext, interaction: HelpInteraction):
   const tr = ctx.i18n.forLocale(interaction.locale);
 
   const supported = await ctx.languages.get();
-  const lines = menuLanguages(supported, tr.language).map((lang) => `**${lang.label}** · \`${lang.code}\``);
+  const lines = menuLanguages(supported, tr.displayLanguage).map((lang) => `**${lang.label}** · \`${lang.code}\``);
   const flags = tr.t("help.flags", { flags: exampleSharedFlags() });
   const description = [tr.t("help.intro"), "", ...lines, "", tr.t("help.usage"), "", flags].join("\n");
 

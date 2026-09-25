@@ -135,6 +135,27 @@ export function menuLanguages(supported: ReadonlySet<string>, uiLang = "en"): Me
   return out.sort((a, b) => a.label.localeCompare(b.label, uiLang));
 }
 
+/**
+ * The language to name languages in for a Discord locale. Anything ICU knows
+ * works, so the locale goes through whole (`pt-BR` names languages Brazilian);
+ * an English one collapses to `en`, which is what keeps the curated labels
+ * ("Norwegian", where ICU says "Norwegian Bokmål").
+ */
+export function displayLanguageForLocale(locale: string): string {
+  const prefix = locale.toLowerCase().split("-")[0] ?? "";
+  return prefix === "" || prefix === FALLBACK_TARGET ? FALLBACK_TARGET : locale;
+}
+
+/**
+ * The same, for a reader known only by a backend code. `zt` and `pb` are
+ * LibreTranslate model spellings that `Intl` rejects, so the def's first code —
+ * always a valid tag — stands in for whatever spelling arrived.
+ */
+export function icuLanguageFor(code: string): string {
+  const def = LANGUAGES.find((candidate) => candidate.codes.includes(code));
+  return def?.codes[0] ?? code;
+}
+
 /** The language's name in `uiLang`, or the code itself when the table doesn't know it. */
 export function labelFor(code: string, uiLang = "en"): string {
   const def = LANGUAGES.find((candidate) => candidate.codes.includes(code));

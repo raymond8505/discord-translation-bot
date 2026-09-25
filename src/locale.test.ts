@@ -4,6 +4,8 @@ import {
   LANGUAGES,
   labelFor,
   menuLanguages,
+  displayLanguageForLocale,
+  icuLanguageFor,
   parseLanguageHint,
   parseLanguageSpec,
   resolveTarget,
@@ -93,6 +95,47 @@ describe("menuLanguages", () => {
     expect(menu).toContainEqual({ code: "de", label: "Allemand" });
     expect(menu).toContainEqual({ code: "zh-Hant", label: "Chinois (traditionnel)" });
     expect(labels[0]).not.toBe(menuLanguages(supported).map((m) => m.label)[0]);
+  });
+});
+
+describe("displayLanguageForLocale", () => {
+  it.each([
+    ["en-US", "en"],
+    ["en-GB", "en"],
+    ["", "en"],
+    ["fr", "fr"],
+    ["pt-BR", "pt-BR"],
+    ["it", "it"],
+  ])("names languages for %j in %s", (locale, uiLang) => {
+    expect(displayLanguageForLocale(locale)).toBe(uiLang);
+  });
+
+  it("keeps the curated English labels rather than ICU's", () => {
+    expect(labelFor("nb", displayLanguageForLocale("en-GB"))).toBe("Norwegian");
+  });
+});
+
+describe("icuLanguageFor", () => {
+  it.each([
+    ["zt", "zh-Hant"],
+    ["zh-Hant", "zh-Hant"],
+    ["pb", "pt-BR"],
+    ["no", "nb"],
+    ["fr", "fr"],
+  ])("turns the backend code %s into the tag %s", (code, tag) => {
+    expect(icuLanguageFor(code)).toBe(tag);
+  });
+
+  it("passes a code the table does not know straight through", () => {
+    expect(icuLanguageFor("ar")).toBe("ar");
+  });
+
+  it("yields a tag ICU accepts for every code in the table", () => {
+    for (const def of LANGUAGES) {
+      for (const code of def.codes) {
+        expect(labelFor("fr", icuLanguageFor(code)), code).not.toBe("");
+      }
+    }
   });
 });
 

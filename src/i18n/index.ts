@@ -1,4 +1,4 @@
-import { resolveTarget } from "../locale.js";
+import { FALLBACK_TARGET, displayLanguageForLocale, icuLanguageFor, resolveLanguageCode, resolveTarget } from "../locale.js";
 import { messages as generatedMessages, type Messages } from "./messages/index.js";
 
 export type MessageKey = keyof Messages;
@@ -8,8 +8,15 @@ export type MessageParams = Readonly<Record<string, string | number>>;
 export type MessageTable = { readonly en: Messages } & Readonly<Record<string, Partial<Messages>>>;
 
 export interface Translator {
-  /** The table language in use (`fr`, `zh-Hant`, ...), also the language to render language names in. */
+  /** The table language the sentences come from (`fr`, `zh-Hant`, ...). */
   readonly language: string;
+  /**
+   * The language to render language *names* in. Not the same thing as
+   * `language`: sentences exist only in the seven languages that have a message
+   * file, while ICU can name a language in any locale Discord sends, so an
+   * Italian reader gets English sentences and Italian language names.
+   */
+  readonly displayLanguage: string;
   t(key: MessageKey, params?: MessageParams): string;
 }
 
@@ -18,6 +25,13 @@ export interface I18n {
   readonly languages: ReadonlySet<string>;
   /** Picks the table language for a Discord locale the same way targets are picked; unknown → `en`. */
   forLocale(discordLocale: string): Translator;
+  /**
+   * The translator for a language named by one of the table's own codes rather
+   * than by a locale — a flag's language, or a target someone asked for. It is
+   * how a reader whose locale Discord never sent still gets their own language:
+   * naming the target names the language the answer is for.
+   */
+  forLanguage(code: string): Translator;
   message(language: string, key: MessageKey, params?: MessageParams): string;
 }
 
@@ -39,12 +53,22 @@ export function createI18n(table: MessageTable = generatedMessages): I18n {
     return interpolate(localized ? localized : table.en[key], params);
   };
 
+  const translator = (language: string, displayLanguage: string): Translator => ({
+    language,
+    displayLanguage,
+    t: (key, params) => message(language, key, params),
+  });
+
   return {
     languages,
     message,
     forLocale(discordLocale) {
-      const language = resolveTarget(discordLocale, languages);
-      return { language, t: (key, params) => message(language, key, params) };
+      return translator(resolveTarget(discordLocale, languages), displayLanguageForLocale(discordLocale));
+    },
+    forLanguage(code) {
+      // The menus' own preferred-first fallback, so a reader asking for zh-Hant
+      // with only zh-Hans on the shelf is answered rather than pushed to English.
+      return translator(resolveLanguageCode(code, languages) ?? FALLBACK_TARGET, icuLanguageFor(code));
     },
   };
 }

@@ -101,7 +101,7 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
 
   const supported = await ctx.languages.get();
 
-  const spec = parseLanguageSpec(interaction.options.getString(TARGET_OPTION) ?? "", supported, tr.language);
+  const spec = parseLanguageSpec(interaction.options.getString(TARGET_OPTION) ?? "", supported, tr.displayLanguage);
   if (spec.unresolved.length > 0) {
     await interaction.editReply(unknownLanguage(tr, spec.unresolved[0] ?? ""));
     return;
@@ -110,7 +110,7 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
   let source = spec.source;
   const sourceRaw = interaction.options.getString(SOURCE_OPTION);
   if (sourceRaw) {
-    source = parseLanguageHint(sourceRaw, supported, tr.language);
+    source = parseLanguageHint(sourceRaw, supported, tr.displayLanguage);
     if (!source) {
       await interaction.editReply(unknownLanguage(tr, sourceRaw));
       return;
@@ -168,7 +168,7 @@ export async function handleTranslateAutocomplete(
     await interaction.respond([]);
     return;
   }
-  const uiLang = ctx.i18n.forLocale(interaction.locale).language;
+  const uiLang = ctx.i18n.forLocale(interaction.locale).displayLanguage;
   const query = interaction.options.getFocused().trim().toLowerCase();
   const choices = menuLanguages(supported, uiLang)
     .filter((lang) => !query || lang.label.toLowerCase().includes(query) || lang.code.startsWith(query))

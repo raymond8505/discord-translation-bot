@@ -96,7 +96,7 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
 
   const supported = await ctx.languages.get();
   const hint = message.content.replace(USER_MENTION, " ");
-  const spec = parseLanguageSpec(hint, supported, tr.language);
+  const spec = parseLanguageSpec(hint, supported, tr.displayLanguage);
   // Free chat around the mention is fine; only the explicit colon form is strict.
   if (hint.includes(":") && spec.unresolved.length > 0) {
     await refuse(
