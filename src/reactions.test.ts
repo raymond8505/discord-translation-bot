@@ -176,14 +176,74 @@ describe("handleFlagReaction", () => {
   it("says so privately when the message has no text to translate", async () => {
     const ctx = makeContext();
     const user = makeReactingUser();
-    const reaction = makeFlagReaction({ content: "", preferredLocale: "fr" });
+    // The flag, not the guild: 🇫🇷 in an English server is a French reader asking.
+    const reaction = makeFlagReaction({ emoji: FLAGS.france, content: "" });
 
     await handleFlagReaction(ctx, reaction, user);
 
     expect(ctx.backend.translateCalls).toEqual([]);
-    // The guild locale, not the reactor's: a reaction carries no user locale.
     expect(lastDmDescription(user)).toBe(frenchMessages["translate.noText"]);
     expect(reaction.calls).toEqual([]);
+  });
+
+  it("words the post in the flag's language, not the guild's", async () => {
+    const ctx = makeContext();
+    const reaction = makeFlagReaction({ emoji: FLAGS.france });
+
+    await handleFlagReaction(ctx, reaction, makeReactingUser());
+
+    // The guild is en-US and a reaction carries no user locale, so before this
+    // the whole reply came back English however French the reader was.
+    const payload = lastReplyPayload(reaction);
+    expect(payload?.embeds[0]?.toJSON().title).toBe(`${frenchMessages["reply.title"]} → Français`);
+    const menus = payload?.components.flatMap((row) => row.toJSON().components) ?? [];
+    expect(menus.at(-1)?.placeholder).toContain(frenchMessages["menu.to"]);
+    expect(menus.flatMap((menu) => menu.options ?? []).map((o) => o.label)).toContain("Allemand");
+  });
+
+  it("names the languages in a language it has no messages of its own for", async () => {
+    const ctx = makeContext();
+    const reaction = makeFlagReaction({ emoji: FLAGS.japan });
+
+    await handleFlagReaction(ctx, reaction, makeReactingUser());
+
+    // No Japanese message file, so the sentences stay English — but ICU can name
+    // every language in Japanese, and those names are the menu.
+    const payload = lastReplyPayload(reaction);
+    expect(payload?.embeds[0]?.toJSON().title).toBe("Translation → 日本語");
+    const options = payload?.components.flatMap((row) => row.toJSON().components[0]?.options ?? []) ?? [];
+    expect(options.map((o) => o.label)).toContain("ドイツ語");
+  });
+
+  it("keeps the guild's wording for a flag that names no language", async () => {
+    const ctx = makeContext();
+    const user = makeReactingUser();
+    // Nothing to read the reader's language off: the flag resolves to nothing.
+    const reaction = makeFlagReaction({ emoji: FLAGS.cambodia, preferredLocale: "fr" });
+
+    await handleFlagReaction(ctx, reaction, user);
+
+    // Guild-locale wording, and its language names with it.
+    expect(lastDmDescription(user)).toContain(FLAGS.cambodia);
+    expect(lastDmDescription(user)).toContain("**Allemand**");
+  });
+
+  it("words a failure in the flag's language once the language set is warm", async () => {
+    const ctx = makeContext({
+      backend: makeFakeBackend({
+        translate: () => {
+          throw new Error("boom");
+        },
+      }),
+    });
+    // The failure notice is built before the trigger has awaited anything, so it
+    // reads the memoized set; a bot that has served one request has it.
+    await ctx.languages.get();
+    const user = makeReactingUser();
+
+    await handleFlagReaction(ctx, makeFlagReaction({ emoji: FLAGS.france }), user);
+
+    expect(lastDmDescription(user)).toBe(frenchMessages["error.generic"]);
   });
 
   it("words a backend failure for the guild and logs it as operational", async () => {

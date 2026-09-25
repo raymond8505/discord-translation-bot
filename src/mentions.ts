@@ -48,8 +48,10 @@ const USER_MENTION = /<@!?\d+>/g;
  * give, and a refusal concerns one person — the channel asked for nothing and
  * should not be told. A DM the user does not accept is dropped.
  *
- * A message carries no user locale (only interactions have one), so even the
- * DM is worded in the guild's preferred language.
+ * A message carries no user locale (only interactions have one). A hint that
+ * names a target says which language the answer is for, so the post — and the
+ * refusals raised after it is parsed — are worded in it; a bare `@bot` names
+ * nothing, and falls back to the guild's preferred language as before.
  */
 export async function handleMentionMessage(ctx: AppContext, message: MentionMessage): Promise<void> {
   if (message.author.bot) return;
@@ -107,6 +109,11 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
     return;
   }
   const target = spec.target ?? resolveTarget(message.guild?.preferredLocale ?? "", supported);
+  // Only an explicit hint tells us anything about the reader. Without one the
+  // guild's translator already words itself in the guild's language, and it says
+  // more than the target derived from that same locale would (a guild locale the
+  // backend cannot translate into still names languages in itself).
+  const reader = spec.target ? ctx.i18n.forLanguage(spec.target) : tr;
 
   const sourceId = sourceIdForMessage(parent.id);
   const source = spec.source ?? AUTO_SOURCE;
@@ -128,7 +135,10 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
       target: outcome.target,
       source,
       post: () =>
-        replyQuietly(message, buildTranslationReply({ ...outcome, sourceId, source, supported, tr })),
+        replyQuietly(
+          message,
+          buildTranslationReply({ ...outcome, sourceId, source, supported, tr: reader }),
+        ),
     });
   } finally {
     thinking.stop();

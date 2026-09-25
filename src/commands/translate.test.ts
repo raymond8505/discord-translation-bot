@@ -7,6 +7,7 @@ import {
   lastPostDescription,
   lastPostPayload,
   lastReplyDescription,
+  lastReplyPayload,
   typedBeforePosting,
   makeAutocompleteInteraction,
   makeChatInputInteraction,
@@ -59,6 +60,24 @@ describe("handleTranslate", () => {
 
     expect(lastReplyDescription(interaction)).toBe("[en] hola");
     expect(interaction.calls.some((call) => call.method === "send")).toBe(false);
+  });
+
+  it("words that ephemeral fallback for the invoker, the only person who sees it", async () => {
+    const ctx = makeContext();
+    const interaction = makeChatInputInteraction({
+      text: "hola",
+      target: "german",
+      locale: "fr",
+      withoutChannel: true,
+    });
+
+    await handleTranslate(ctx, interaction);
+
+    // German is the target, but nothing is going to the channel: the audience is
+    // one French-speaking person.
+    expect(lastReplyPayload(interaction)?.embeds[0]?.toJSON().title).toBe(
+      `${frenchMessages["reply.title"]} → Allemand`,
+    );
   });
 
   it("records nothing for free text, which has no message an edit could change", async () => {
@@ -138,7 +157,24 @@ describe("handleTranslate", () => {
     const named = makeChatInputInteraction({ text: "hola", target: "allemand", locale: "fr" });
     await handleTranslate(ctx, named);
     expect(ctx.backend.translateCalls.map((c) => c.target)).toEqual(["de"]);
-    expect(lastPostPayload(named)?.embeds[0]?.toJSON().title).toBe(`${frenchMessages["reply.title"]} → Allemand`);
+    // The naming is the point: a French user's "allemand" resolves to German.
+    // The post itself is then German, because that is who it was asked for — the
+    // ephemeral acknowledgement is the part addressed to the invoker.
+    expect(lastPostPayload(named)?.embeds[0]?.toJSON().title).toBe("Translation → Deutsch");
+    expect(lastReplyDescription(named)).toBe(frenchMessages["reply.posted"]);
+  });
+
+  it("words the public post in the target and the acknowledgement in the invoker's locale", async () => {
+    const ctx = makeContext();
+    const interaction = makeChatInputInteraction({ text: "hello", target: "french", locale: "en-US" });
+
+    await handleTranslate(ctx, interaction);
+
+    const embed = lastPostPayload(interaction)?.embeds[0]?.toJSON();
+    expect(embed?.title).toBe(`${frenchMessages["reply.title"]} → Français`);
+    // French wording and a French-named source language, for an en-US invoker.
+    expect(embed?.footer?.text).toContain("source : Espagnol");
+    expect(lastReplyDescription(interaction)).toBe("Posted the translation in the channel.");
   });
 });
 

@@ -74,23 +74,28 @@ export async function handleLanguageSelect(
   }
 
   const supported = await ctx.languages.get();
+  // The target is always something somebody picked from a menu — this pick, or
+  // the one carried in the customId — so the public post is worded in it. The
+  // ephemeral acknowledgement stays in the clicker's own locale.
+  const reader = ctx.i18n.forLanguage(target);
   const forced = source === AUTO_VALUE ? undefined : source;
   // The defer's "thinking" state is ephemeral, so only the clicker has any sign
   // that this is under way — and the new post is going to land in the channel.
   const thinking = showThinking(ctx.log, interaction.channel);
   try {
     const outcome = await translateWithCache(ctx, { sourceId: parsed.sourceId, text, target, source: forced });
+
+    // Unpostable channels get here only when `resolveSourceText` found the text in
+    // the cache, so the ephemeral reply is the last place left to put the result —
+    // and with an audience of one it is worded in that one person's locale.
+    const send = interaction.channel?.send?.bind(interaction.channel);
     const reply = buildTranslationReply({
       ...outcome,
       sourceId: parsed.sourceId,
       source: forced ?? AUTO_SOURCE,
       supported,
-      tr,
+      tr: send ? reader : tr,
     });
-
-    // Unpostable channels get here only when `resolveSourceText` found the text in
-    // the cache, so the ephemeral reply is the last place left to put the result.
-    const send = interaction.channel?.send?.bind(interaction.channel);
     if (!send) {
       await interaction.editReply(reply);
       return;

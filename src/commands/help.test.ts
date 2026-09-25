@@ -56,6 +56,18 @@ describe("handleHelp", () => {
     expect(lastReplyDescription(interaction)).toContain("**Allemand** · `de`");
   });
 
+  it("names the languages in a locale it has no messages of its own for", async () => {
+    const ctx = makeContext();
+    const interaction = makeHelpInteraction("it");
+
+    await handleHelp(ctx, interaction);
+
+    // No Italian message file, so the page reads English — but the list is what
+    // the reader came for, and ICU names every language in Italian.
+    expect(lastReplyPayload(interaction)?.embeds[0]?.toJSON().title).toBe("Supported languages");
+    expect(lastReplyDescription(interaction)).toContain("**Tedesco** · `de`");
+  });
+
   it("still explains the triggers when the backend reports no languages", async () => {
     const ctx = makeContext({ backend: makeFakeBackend({ languages: async () => [] }) });
     const interaction = makeHelpInteraction();

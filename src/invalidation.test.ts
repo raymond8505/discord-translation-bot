@@ -5,6 +5,7 @@ import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
 import { MESSAGE_ID } from "./fixtures/interaction.fixture.js";
 import { makeEditedMessage } from "./fixtures/invalidation.fixture.js";
 import { makeFakeMessageEditor } from "./fixtures/messageEditor.fixture.js";
+import { frenchMessages } from "./fixtures/messages.fixture.js";
 import { makePostRef, POSTED_MESSAGE_ID } from "./fixtures/post.fixture.js";
 import { makeFakeRedis } from "./fixtures/redis.fixture.js";
 import { createMessageInvalidator, shouldInvalidateOnUpdate } from "./invalidation.js";
@@ -120,6 +121,19 @@ describe("createMessageInvalidator", () => {
     ]);
     expect(ctx.messages.edits.map((edit) => edit.ref.target)).toEqual(["fr", "de"]);
     expect(ctx.messages.edits[0]?.payload.embeds[0]?.toJSON().description).toBe("[fr] adios");
+  });
+
+  it("rewrites each post in its own target's language", async () => {
+    const ctx = makeContext({ redis: withPosts("fr", "de") });
+
+    await createMessageInvalidator(ctx).onUpdate(full("hola"), full("adios"));
+
+    // Each post is the language its readers asked for, and a rewrite has to keep
+    // it: one translator for the whole refresh re-worded them all as the guild.
+    expect(ctx.messages.edits.map((edit) => edit.payload.embeds[0]?.toJSON().title)).toEqual([
+      `${frenchMessages["reply.title"]} → Français`,
+      "Translation → Deutsch",
+    ]);
   });
 
   it("keeps a forced source when it re-translates", async () => {

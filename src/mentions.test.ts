@@ -23,6 +23,31 @@ describe("handleMentionMessage", () => {
     expect(message.hasOptions[0]).toEqual({ ignoreEveryone: true, ignoreRoles: true, ignoreRepliedUser: true });
   });
 
+  it("words the post in the language the hint asked for, not the guild's", async () => {
+    const ctx = makeContext();
+    const message = makeMentionMessage({ content: `<@${BOT_USER_ID}> french` });
+
+    await handleMentionMessage(ctx, message);
+
+    // The guild is en-US; the person asking named the language the post is for.
+    const payload = lastReplyPayload(message);
+    expect(payload?.embeds[0]?.toJSON().title).toBe(`${frenchMessages["reply.title"]} → Français`);
+    const options = payload?.components.flatMap((row) => row.toJSON().components[0]?.options ?? []) ?? [];
+    expect(options.map((o) => o.label)).toContain("Allemand");
+  });
+
+  it("keeps the guild's wording when nothing names a language", async () => {
+    const ctx = makeContext();
+    const message = makeMentionMessage({ preferredLocale: "fr" });
+
+    await handleMentionMessage(ctx, message);
+
+    // A bare @bot says nothing about its reader, so the guild still decides.
+    expect(lastReplyPayload(message)?.embeds[0]?.toJSON().title).toBe(
+      `${frenchMessages["reply.title"]} → Français`,
+    );
+  });
+
   it("shows the channel the bot working before the translation lands", async () => {
     const ctx = makeContext();
     const message = makeMentionMessage();

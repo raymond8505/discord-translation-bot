@@ -84,6 +84,15 @@ describe("menuLanguages", () => {
     expect(menu.map((m) => m.label)).not.toContain("Portuguese (Brazil)");
   });
 
+  it("never throws for a language ICU cannot parse", () => {
+    // The names are guarded inside displayLabel; the sort's own localeCompare is
+    // not, and the reader's language now comes from a flag or a customId.
+    for (const uiLang of ["auto", "", "t_0123456789abcdef", "not a locale"]) {
+      expect(() => menuLanguages(supported, uiLang), uiLang).not.toThrow();
+      expect(menuLanguages(supported, uiLang)).toEqual(menuLanguages(supported, "en"));
+    }
+  });
+
   it("fits within two 25-option select menus", () => {
     expect(menuLanguages(supported).length).toBeLessThanOrEqual(50);
   });
@@ -124,6 +133,16 @@ describe("icuLanguageFor", () => {
     ["fr", "fr"],
   ])("turns the backend code %s into the tag %s", (code, tag) => {
     expect(icuLanguageFor(code)).toBe(tag);
+  });
+
+  it("gives every code in the table a tag Intl accepts", () => {
+    // icuLanguageFor leans on codes[0] always being a valid BCP-47 tag, which is
+    // a comment in the table and otherwise nothing's job to keep true.
+    for (const def of LANGUAGES) {
+      for (const code of def.codes) {
+        expect(() => Intl.getCanonicalLocales(icuLanguageFor(code)), code).not.toThrow();
+      }
+    }
   });
 
   it("passes a code the table does not know straight through", () => {

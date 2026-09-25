@@ -72,7 +72,6 @@ export function createMessageInvalidator(ctx: InvalidationContext): MessageInval
   };
 
   const refresh = async (message: InvalidationMessage, refs: readonly PostRef[]): Promise<void> => {
-    const tr = ctx.i18n.forLocale(message.guild?.preferredLocale ?? "");
     const supported = await ctx.languages.get();
     const text = message.content ?? "";
 
@@ -102,7 +101,9 @@ export function createMessageInvalidator(ctx: InvalidationContext): MessageInval
           sourceId: message.id,
           source: ref.source,
           supported,
-          tr,
+          // Each post has its own target, and it is the language its readers
+          // asked for — a rewrite must not re-word it into some other one.
+          tr: ctx.i18n.forLanguage(ref.target),
         });
         if ((await ctx.messages.edit(ref, reply)) === "gone") {
           ctx.log.info(`edit refresh: post ${ref.messageId} is gone; forgetting it`);

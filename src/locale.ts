@@ -83,6 +83,23 @@ function displayLabel(def: LanguageDef, uiLang: string): string {
   }
 }
 
+/**
+ * `uiLang` reaches ICU twice in `menuLanguages`, and only one of them is
+ * defended: `displayLabel` catches its own throw, while `localeCompare` on the
+ * sort does not, and `Intl` rejects anything it cannot parse as a tag with a
+ * RangeError. Callers now name the reader's language from whatever they know of
+ * them — a Discord locale, a backend code — so an unusable value becomes English
+ * here rather than throwing out of a half-built reply.
+ */
+function icuSafe(uiLang: string): string {
+  try {
+    Intl.getCanonicalLocales(uiLang);
+    return uiLang;
+  } catch {
+    return FALLBACK_TARGET;
+  }
+}
+
 const PARENTHETICAL = /\s*[(（].*[)）]$/;
 
 function defForLocale(locale: string): LanguageDef | undefined {
@@ -124,15 +141,16 @@ export function resolveLanguageCode(code: string, supported: ReadonlySet<string>
  * already-listed code is dropped), named in `uiLang` and sorted by that name.
  */
 export function menuLanguages(supported: ReadonlySet<string>, uiLang = "en"): MenuLanguage[] {
+  const lang = icuSafe(uiLang);
   const seen = new Set<string>();
   const out: MenuLanguage[] = [];
   for (const def of LANGUAGES) {
     const code = firstSupported(def, supported);
     if (!code || seen.has(code)) continue;
     seen.add(code);
-    out.push({ code, label: displayLabel(def, uiLang) });
+    out.push({ code, label: displayLabel(def, lang) });
   }
-  return out.sort((a, b) => a.label.localeCompare(b.label, uiLang));
+  return out.sort((a, b) => a.label.localeCompare(b.label, lang));
 }
 
 /**

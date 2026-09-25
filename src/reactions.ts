@@ -59,8 +59,9 @@ const UNSUPPORTED_BUCKET = "unsupported";
  * reply to give, and a refusal concerns one person — the channel asked for
  * nothing and should not be told. A DM the user does not accept is dropped.
  *
- * A reaction carries no user locale (only interactions have one), so even the
- * DM is worded in the guild's preferred language.
+ * A reaction carries no user locale (only interactions have one), so the flag is
+ * read as one: 🇫🇷 is someone asking for French, whoever they are, and both the
+ * post and the DM are worded in it. See `readerTranslator()`.
  *
  * Reactions that are not flags are ignored in silence; a flag the bot has no
  * language for is answered privately with the flags that would have worked.
@@ -98,33 +99,59 @@ export async function handleFlagReaction(
   const self = message.client.user?.id;
   if (self !== undefined && message.author?.id === self) return;
 
-  const tr = ctx.i18n.forLocale(message.guild?.preferredLocale ?? "");
+  const guildLocale = message.guild?.preferredLocale ?? "";
   try {
-    await translateForFlag(ctx, message, full.emoji.name ?? "", tr, user);
+    await translateForFlag(ctx, message, full.emoji.name ?? "", guildLocale, user);
   } catch (err) {
     if (isOperational(err)) ctx.log.warn("flag reaction: backend failure", err);
     else ctx.log.error("flag reaction: unexpected failure", err);
+    // Worded here rather than before the try: by now the language set has been
+    // fetched, so the flag resolves. It is still empty when the fetch itself is
+    // what failed, and then the guild's locale is all anyone honestly has.
+    const tr = readerTranslator(ctx, full.emoji.name ?? "", guildLocale);
     await sendDirect(ctx.log, user, buildNoticeReply(userMessageFor(err, tr)), "flag reaction");
   }
+}
+
+/**
+ * Words what this trigger says in the language the flag asked for. Discord sends
+ * a user locale only on interactions, so the alternative is the guild's
+ * preferred locale — which answers a French reader in an English server in
+ * English, the thing this replaces. A flag is a better signal than a locale
+ * anyway: it says which language *this* answer is for.
+ *
+ * `peek()` rather than `get()` because the only caller is a failure path that
+ * must not make a backend call of its own to report a backend call failing. A
+ * flag the bot has no language for, and a language set that was never fetched,
+ * both leave nothing to read the reader off: the guild's locale stands in.
+ */
+function readerTranslator(ctx: AppContext, emoji: string, guildLocale: string): Translator {
+  const supported = ctx.languages.peek();
+  const language = supported ? languageForFlag(emoji, supported) : null;
+  return language ? ctx.i18n.forLanguage(language) : ctx.i18n.forLocale(guildLocale);
 }
 
 async function translateForFlag(
   ctx: AppContext,
   message: ReactedMessage,
   emoji: string,
-  tr: Translator,
+  guildLocale: string,
   user: ReactingUser,
 ): Promise<void> {
   const supported = await ctx.languages.get();
   const target = languageForFlag(emoji, supported);
   if (alreadyAsked(message, target, supported)) return;
 
+  // The set is in hand here, so the flag resolves for certain. A flag with no
+  // language behind it names none, and that refusal falls back to the guild.
+  const reader = target === null ? ctx.i18n.forLocale(guildLocale) : ctx.i18n.forLanguage(target);
+
   const sourceId = sourceIdForMessage(message.id);
   if (target === null) {
     await sendDirect(
       ctx.log,
       user,
-      buildUnsupportedFlagReply({ flag: emoji, supported, tr }),
+      buildUnsupportedFlagReply({ flag: emoji, supported, tr: reader }),
       "flag reaction",
     );
     return;
@@ -132,7 +159,7 @@ async function translateForFlag(
 
   const text = message.content ?? "";
   if (!text.trim()) {
-    await sendDirect(ctx.log, user, buildNoticeReply(tr.t("translate.noText")), "flag reaction");
+    await sendDirect(ctx.log, user, buildNoticeReply(reader.t("translate.noText")), "flag reaction");
     return;
   }
 
@@ -149,7 +176,7 @@ async function translateForFlag(
       post: () =>
         replyQuietly(
           message,
-          buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
+          buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr: reader }),
         ),
     });
   } finally {

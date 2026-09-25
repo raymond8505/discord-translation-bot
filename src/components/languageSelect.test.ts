@@ -39,6 +39,31 @@ describe("handleLanguageSelect", () => {
     expect(ctx.backend.translateCalls).toEqual([{ text: "hola", source: "auto", target: "de" }]);
   });
 
+  it("words the post in the picked language and the acknowledgement in the clicker's", async () => {
+    const ctx = makeContext({ redis: withSource("hola") });
+    const interaction = makeSelectInteraction({ customId: targetMenu, value: "fr", locale: "en-US" });
+
+    await handleLanguageSelect(ctx, interaction);
+
+    // Picking a target is naming the language the post is for; the ephemeral
+    // line is the one addressed to whoever clicked.
+    expect(lastPostPayload(interaction)?.embeds[0]?.toJSON().title).toBe(
+      `${frenchMessages["reply.title"]} → Français`,
+    );
+    expect(lastReplyDescription(interaction)).toBe("Posted the translation in the channel.");
+  });
+
+  it("keeps the preserved target's language when only the source is picked", async () => {
+    const ctx = makeContext({ redis: withSource("hola") });
+    // `sourceMenu` carries target `en`, so an English post from a French clicker.
+    const interaction = makeSelectInteraction({ customId: sourceMenu, value: "es", locale: "fr" });
+
+    await handleLanguageSelect(ctx, interaction);
+
+    expect(lastPostPayload(interaction)?.embeds[0]?.toJSON().title).toBe("Translation → English");
+    expect(lastReplyDescription(interaction)).toBe(frenchMessages["reply.posted"]);
+  });
+
   it("records the post so an edit to the message reaches it too", async () => {
     const ctx = makeContext({ redis: withSource("hola") });
 

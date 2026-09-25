@@ -118,24 +118,29 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
   }
 
   const target = spec.target ?? resolveTarget(interaction.locale, supported);
+  // The post is public and for whoever reads that language; the ephemeral
+  // acknowledgements below stay in the invoker's own locale. Without an explicit
+  // target the two are the same language anyway.
+  const reader = spec.target ? ctx.i18n.forLanguage(spec.target) : tr;
   const sourceId = sourceIdForText(text);
   // The defer's "thinking" state is ephemeral, so only the invoker has any sign
   // that this is under way — and the translation is going to land in the channel.
   const thinking = showThinking(ctx.log, interaction.channel);
   try {
     const outcome = await translateWithCache(ctx, { sourceId, text, target, source: source ?? undefined });
+
+    // The translation belongs in the channel, where the people it is for can read
+    // it. With nowhere to post it there is no audience beyond the invoker, so the
+    // ephemeral reply carries it instead — and is worded for them, not for the
+    // room that is never going to see it.
+    const send = interaction.channel?.send?.bind(interaction.channel);
     const reply = buildTranslationReply({
       ...outcome,
       sourceId,
       source: source ?? AUTO_SOURCE,
       supported,
-      tr,
+      tr: send ? reader : tr,
     });
-
-    // The translation belongs in the channel, where the people it is for can read
-    // it. With nowhere to post it there is no audience beyond the invoker, so the
-    // ephemeral reply carries it instead.
-    const send = interaction.channel?.send?.bind(interaction.channel);
     if (!send) {
       await interaction.editReply(reply);
       return;
