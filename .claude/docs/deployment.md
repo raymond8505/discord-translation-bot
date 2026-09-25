@@ -146,8 +146,8 @@ Two of those are OpenSSH **private** keys, and they authenticate opposite direct
 `authorized_keys`), `GH_DEPLOY_KEY` is how the VPS clones this repo (its public half is a
 write-disabled repo deploy key). GitHub strips the trailing newline from a multiline secret, so the
 `printf '%s\n'` that writes `GH_DEPLOY_KEY` to `~/.ssh/github_discord_translation_bot` is load-bearing —
-`printf '%s'` yields `error in libcrypto`. Generating and installing both keys: README → "Repository
-secrets".
+`printf '%s'` yields `error in libcrypto`. Generating and installing both keys: DEPLOY.md →
+"Repository secrets".
 
 ## LibreTranslate first start
 

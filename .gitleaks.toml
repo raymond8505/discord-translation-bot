@@ -11,11 +11,11 @@ useDefault = true
 
 [[allowlists]]
 description = """
-README's deploy section documents generating the two SSH keys, and quotes the
-PEM header so the reader knows which lines to copy. It is the literal string
+DEPLOY.md, the VPS runbook, documents generating the two SSH keys, and quotes
+the PEM header so the reader knows which lines to copy. It is the literal string
 "-----BEGIN OPENSSH PRIVATE KEY-----" in prose, never key material.
 """
-paths = ['''^README\.md$''']
+paths = ['''^DEPLOY\.md$''']
 regexes = ['''-----BEGIN OPENSSH PRIVATE KEY-----''']
 
 [[allowlists]]
