@@ -114,9 +114,9 @@ There is no migration.
 
 ### The TTL slides
 
-`CACHE_TTL_SECONDS` defaults to **86400 (one day)**, and every *read* of a translation puts the full
+`CACHE_TTL_SECONDS` defaults to **259200 (three days)**, and every *read* of a translation puts the full
 TTL back — `cache.get` is a `GETEX key EX ttl`, not a `GET`. A phrase a guild keeps reposting is
-therefore kept for as long as it stays in use, and a one-off is gone the next day, so the keyspace
+therefore kept for as long as it stays in use, and a one-off is gone three days later, so the keyspace
 settles at the size of what a guild repeats rather than everything it has ever translated.
 
 `GETEX` (Redis ≥ 6.2; the stack runs 7.4) rather than `GET` + `EXPIRE`: one round trip, and no
@@ -128,8 +128,8 @@ pushed out too, which is harmless — the caller reads it as a miss and overwrit
 each post. Both are refreshed by use, just by writing rather than reading.
 
 **What the shorter TTL costs.** Edit-follow and the re-translate menu reach back through `src:` and
-`post:`, so a message edited more than a day after its last translation no longer has its posts
-rewritten, and its menu reports expiry. That is the trade for a small keyspace; raise
+`post:`, so a message edited more than three days after its last translation keeps the posts it
+already has, and its menu reports expiry. That is the trade for a small keyspace; raise
 `CACHE_TTL_SECONDS` if a guild edits old messages and cares.
 
 ## Invalidation and edit-follow

@@ -172,7 +172,7 @@ describe("translateWithCache", () => {
 
     await translateWithCache(ctx, { sourceId: ID, text: "hola", target: "en" });
     const key = translationKey(HOLA, "auto", "en");
-    // Age the entry, as most of a day unused would.
+    // An entry that has sat unused sits at the edge of its TTL.
     const record = ctx.redis.store.get(key);
     if (record) record.ex = 1;
 

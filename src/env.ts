@@ -20,12 +20,13 @@ export const envSchema = z.object({
   LT_URL: z.url({ protocol: /^https?$/ }),
   BACKEND: z.enum(["libretranslate", "ollama"]).default("libretranslate"),
   /**
-   * One day, and it slides: every read of a translation puts the full TTL back
-   * (`src/cache.ts`), so a phrase the guild keeps reposting stays cached while
-   * it stays in use and a one-off is gone the next day. The keyspace ends up
-   * the size of what a guild repeats, not of everything it has ever said.
+   * Three days, and it slides: every read of a translation puts the full TTL
+   * back (`src/cache.ts`), so a phrase the guild keeps reposting stays cached
+   * while it stays in use and a one-off is gone three days later. The keyspace
+   * ends up the size of what a guild repeats, not of everything it has ever
+   * said.
    */
-  CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86_400),
+  CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(259_200),
   /**
    * Per-user budget, not a cooldown between requests: a fast-moving thread has
    * one person translating several messages in a row, and a fixed delay would

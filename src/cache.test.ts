@@ -96,7 +96,7 @@ describe("createCache", () => {
     const redis = makeFakeRedis();
     const cache = createCache(redis, TTL);
     await cache.set(HASH, "auto", "en", makeCacheEntry());
-    // Age it, as a day of sitting unused would.
+    // An entry that has sat unused sits at the edge of its TTL.
     const record = redis.store.get(translationKey(HASH, "auto", "en"));
     if (record) record.ex = 5;
 

@@ -8,7 +8,7 @@ export const validEnvSource = {
   REDIS_URL: "redis://redis:6379",
   LT_URL: "http://libretranslate:5000",
   BACKEND: "libretranslate",
-  CACHE_TTL_SECONDS: "86400",
+  CACHE_TTL_SECONDS: "259200",
 } satisfies EnvSource;
 
 export function makeEnvSource(overrides: EnvSource = {}): EnvSource {
@@ -23,7 +23,7 @@ export const validEnv: Env = {
   REDIS_URL: "redis://redis:6379",
   LT_URL: "http://libretranslate:5000",
   BACKEND: "libretranslate",
-  CACHE_TTL_SECONDS: 2_592_000,
+  CACHE_TTL_SECONDS: 259_200,
   RATE_LIMIT_USER_PER_MIN: 20,
   RATE_LIMIT_GUILD_PER_HOUR: 2_000,
 };
