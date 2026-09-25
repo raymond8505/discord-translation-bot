@@ -40,7 +40,11 @@ export interface TranslationReplyInput {
   readonly cached: boolean;
   readonly sameLanguage: boolean;
   readonly supported: ReadonlySet<string>;
-  /** Words the reply and names the languages for the reader. */
+  /**
+   * Words the reply and names the languages for the reader. For a public post
+   * that is the language it translates into, not the locale of whoever asked —
+   * see `.claude/docs/i18n.md`.
+   */
   readonly tr: Translator;
 }
 

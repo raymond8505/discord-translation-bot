@@ -38,8 +38,10 @@ Add a new command by exporting its builder from `src/commands/`, appending it to
 - **Limits enforced in `src/reply.ts`**: embed description ≤ 4096 (truncated with `…`), ≤ 25 options
   per select menu, at most 2 menus per role (4 rows). Input text is capped at 4000 chars in
   `src/translate.ts`.
-- **Every string goes through `ctx.i18n.forLocale(interaction.locale)`** (guild locale on the mention
-  trigger); language names and hint parsing take `tr.language`. See [i18n.md](i18n.md).
+- **Every string goes through a `Translator`**, and which one depends on who is reading: a public
+  translation is worded in the language it translates into (`ctx.i18n.forLanguage(target)`), an
+  ephemeral answer in `interaction.locale`. Language names and hint parsing take
+  `tr.displayLanguage`, never `tr.language`. See [i18n.md](i18n.md).
 - **Every trigger that can reach the backend checks `ctx.rateLimiter` first** — see below.
 
 ## Posts into a thread are silent
@@ -106,8 +108,11 @@ A closed DM (`50007` — the member disallows messages from the guild's bots) is
 not an error: it is logged and the refusal is dropped. There is deliberately **no fallback to a
 channel post**, because that would make privacy depend on a setting the bot cannot see beforehand.
 
-The DM is worded in the **guild's** preferred locale, not the recipient's. Discord exposes a user
-locale only on interactions — `User` carries none — so neither trigger can know it.
+Discord exposes a user locale only on interactions — `User` carries none — so a DM is worded in the
+language that was **asked for**: the flag's language, or the mention's hint. That is the better
+guess and not just an available one, because a 🇫🇷 reaction says which language the answer is for. A
+refusal raised before any language is known — no reply reference, an unreadable parent, a flag the
+bot has no language for — falls back to the guild's `preferredLocale`.
 
 A flag with no language gets `buildUnsupportedFlagReply()` (`src/reply.ts`): the flag that failed,
 every language on offer with **every** flag that asks for it, and a line pointing at the server
@@ -203,6 +208,10 @@ reaction *removal* does nothing.
 A pick posts a **new** public translation rather than rewriting the one it was clicked on: that post
 is a translation someone else asked for, and it keeps following its own source message. The clicker
 gets the ephemeral `reply.posted` acknowledgement.
+
+Two translators are in play in that one handler, and mixing them is the easy mistake: the post is
+worded in its target (a **source** pick keeps the target it was carrying, so it keeps that target's
+language), while every `editReply` notice is worded in the clicker's own locale.
 
 Every translation reply carries up to four select rows: two **source** menus (Auto-detect first,
 then the languages, preselecting what was detected or forced) and two **target** menus (preselecting

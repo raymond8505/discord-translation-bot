@@ -31,7 +31,8 @@ No keyspace sweep exists today (the cache is content-keyed, so nothing needs one
 needed, `SCAN`, never `KEYS`.
 
 **No user-facing string literals in `src/`**: every reply, embed, placeholder and command description
-is a key in `src/i18n/messages/en.json` rendered through a `Translator` (`ctx.i18n.forLocale(...)`).
+is a key in `src/i18n/messages/en.json` rendered through a `Translator` — `ctx.i18n.forLocale(locale)`
+for a reader Discord named, `ctx.i18n.forLanguage(target)` for the language an answer was asked for.
 
 ## Read the doc when the trigger fires
 

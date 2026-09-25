@@ -39,8 +39,14 @@ pattern accepts `xx`, `xxx`, and `xx-Xxxx` forms.
 - `resolveTarget(locale, supported)`: table → bare prefix → `en`.
 - `resolveLanguageCode(code, supported)`: one table code → the first of its `codes` the backend
   serves, else null. `src/flags.ts` maps flag emoji onto table codes and resolves them through it.
+- `displayLanguageForLocale(locale)` / `icuLanguageFor(code)`: the language to *name* languages in,
+  for a reader known by a Discord locale or by a backend code. Neither goes through the message
+  files — ICU names languages in locales the bot has no sentences for — and `icuLanguageFor` exists
+  because `zt`/`pb` are model spellings `Intl` rejects. See [i18n.md](i18n.md).
 - `menuLanguages(supported, uiLang)`: dedupes by backend code, named in `uiLang` and sorted by that
-  name (≤ 50 for two menus).
+  name (≤ 50 for two menus). An unparseable `uiLang` reads as `en` rather than throwing: the sort's
+  `localeCompare` is not covered by `displayLabel`'s own catch, and callers name the reader's language
+  from whatever they have of them — a flag, a customId.
 - `labelFor(code, uiLang)`: the table label for `en`; otherwise ICU's `Intl.DisplayNames` on the
   def's first code, capitalised. Never passes `auto` or a `t_…` id to ICU (it throws).
 - `parseLanguageHint(text, supported, uiLang)`: English or `uiLang` label / code / locale, tolerates
