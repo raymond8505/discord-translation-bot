@@ -268,8 +268,7 @@ charities, schools, public research and government bodies.
 
 Using it commercially — bundling it into a paid product, running it as a service you
 charge for, or operating it for a for-profit company's own business — needs a separate
-licence. Open an issue or email <raymond@raymondselzer.net> and ask; the answer is not
-automatically no.
+licence. Open an issue to inquire about commercial use.
 
 This is *source-available*, not OSI open source: an OSI-approved licence may not restrict
 commercial use, and this one deliberately does.
