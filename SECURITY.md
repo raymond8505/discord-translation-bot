@@ -14,10 +14,6 @@ Report privately through GitHub:
 
 **[Security → Report a vulnerability](https://github.com/raymond8505/discord-translation-bot/security/advisories/new)**
 
-If private reporting is unavailable, email <raymond@raymondselzer.net> with `SECURITY`
-in the subject. That address already appears on every commit in this repository, so it
-is not a private channel — use the GitHub form when you can.
-
 Useful things to include: what an attacker can do, the steps to reproduce it, and which
 commit you tested. Expect a first response within a week; this is a side project, not a
 staffed product.
