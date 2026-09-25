@@ -14,8 +14,20 @@ description = """
 DEPLOY.md, the VPS runbook, documents generating the two SSH keys, and quotes
 the PEM header so the reader knows which lines to copy. It is the literal string
 "-----BEGIN OPENSSH PRIVATE KEY-----" in prose, never key material.
+
+condition = "AND" is load-bearing: criteria within one allowlist default to OR,
+which would allowlist that header in every file in the repo — and a real
+OpenSSH private key opens with exactly that line, so the entry meant to excuse
+one sentence of prose would excuse the leak it describes. AND keeps the excuse
+to this header in these files.
+
+README.md is listed alongside DEPLOY.md because CI scans the full history, and
+the runbook lived in README.md until it moved. A path drops off this list only
+once no commit reachable from main still carries the header there, which a
+history rewrite is the only way to reach — so treat the list as append-only.
 """
-paths = ['''^DEPLOY\.md$''']
+condition = "AND"
+paths = ['''^README\.md$''', '''^DEPLOY\.md$''']
 regexes = ['''-----BEGIN OPENSSH PRIVATE KEY-----''']
 
 [[allowlists]]
