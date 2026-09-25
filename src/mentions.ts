@@ -9,6 +9,7 @@ import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "./re
 import { sourceIdForMessage } from "./sourceId.js";
 import { postOptionsFor, type PostChannel, type PostOptions } from "./threads.js";
 import { AUTO_SOURCE, translateWithCache } from "./translate.js";
+import { showThinking } from "./typing.js";
 
 /** The slice of `Message` the mention trigger touches. */
 export interface MentionMessage {
@@ -108,22 +109,30 @@ async function translateParent(ctx: AppContext, message: MentionMessage, tr: Tra
   const target = spec.target ?? resolveTarget(message.guild?.preferredLocale ?? "", supported);
 
   const sourceId = sourceIdForMessage(parent.id);
-  const outcome = await translateWithCache(ctx, {
-    sourceId,
-    text: parent.content,
-    target,
-    source: spec.source ?? undefined,
-  });
   const source = spec.source ?? AUTO_SOURCE;
-  // Recorded against the message that was *translated*, not the mention that
-  // asked: an edit to the parent is what this post has to follow.
-  await publishTranslation(ctx, {
-    sourceId,
-    target: outcome.target,
-    source,
-    post: () =>
-      replyQuietly(message, buildTranslationReply({ ...outcome, sourceId, source, supported, tr })),
-  });
+  // From here on something is owed to the channel, so it is shown the bot
+  // working. Stopped in a `finally` because a backend failure is answered by a
+  // DM one frame up, and the bot must not still look busy while that goes out.
+  const thinking = showThinking(ctx.log, message.channel);
+  try {
+    const outcome = await translateWithCache(ctx, {
+      sourceId,
+      text: parent.content,
+      target,
+      source: spec.source ?? undefined,
+    });
+    // Recorded against the message that was *translated*, not the mention that
+    // asked: an edit to the parent is what this post has to follow.
+    await publishTranslation(ctx, {
+      sourceId,
+      target: outcome.target,
+      source,
+      post: () =>
+        replyQuietly(message, buildTranslationReply({ ...outcome, sourceId, source, supported, tr })),
+    });
+  } finally {
+    thinking.stop();
+  }
 }
 
 /** A refusal goes to the person who asked, never to the channel. */

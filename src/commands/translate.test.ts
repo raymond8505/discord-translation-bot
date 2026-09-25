@@ -7,6 +7,7 @@ import {
   lastPostDescription,
   lastPostPayload,
   lastReplyDescription,
+  typedBeforePosting,
   makeAutocompleteInteraction,
   makeChatInputInteraction,
 } from "../fixtures/interaction.fixture.js";
@@ -43,6 +44,8 @@ describe("handleTranslate", () => {
     expect(interaction.calls[0]).toEqual({ method: "deferReply", payload: { flags: MessageFlags.Ephemeral } });
     expect(lastPostDescription(interaction)).toBe("[en] hola");
     expect(lastReplyDescription(interaction)).toBe("Posted the translation in the channel.");
+    // The invoker sees the defer; the channel sees the bot working.
+    expect(typedBeforePosting(interaction)).toBe(true);
     expect(ctx.backend.translateCalls).toEqual([{ text: "hola", source: "auto", target: "en" }]);
     expect(ctx.redis.store.has(translationKey(contentHash("hola"), "auto", "en"))).toBe(true);
     expect(lastPostPayload(interaction)?.components.length).toBeGreaterThan(0);

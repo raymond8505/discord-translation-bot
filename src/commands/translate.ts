@@ -13,6 +13,7 @@ import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../r
 import { sourceIdForText } from "../sourceId.js";
 import { postOptionsFor, type PostChannel, type PostOptions } from "../threads.js";
 import { AUTO_SOURCE, MAX_INPUT_CHARS, translateWithCache } from "../translate.js";
+import { showThinking } from "../typing.js";
 
 export const TRANSLATE_COMMAND_NAME = "translate";
 const TEXT_OPTION = "text";
@@ -118,30 +119,37 @@ export async function handleTranslate(ctx: AppContext, interaction: TranslateInt
 
   const target = spec.target ?? resolveTarget(interaction.locale, supported);
   const sourceId = sourceIdForText(text);
-  const outcome = await translateWithCache(ctx, { sourceId, text, target, source: source ?? undefined });
-  const reply = buildTranslationReply({
-    ...outcome,
-    sourceId,
-    source: source ?? AUTO_SOURCE,
-    supported,
-    tr,
-  });
+  // The defer's "thinking" state is ephemeral, so only the invoker has any sign
+  // that this is under way — and the translation is going to land in the channel.
+  const thinking = showThinking(ctx.log, interaction.channel);
+  try {
+    const outcome = await translateWithCache(ctx, { sourceId, text, target, source: source ?? undefined });
+    const reply = buildTranslationReply({
+      ...outcome,
+      sourceId,
+      source: source ?? AUTO_SOURCE,
+      supported,
+      tr,
+    });
 
-  // The translation belongs in the channel, where the people it is for can read
-  // it. With nowhere to post it there is no audience beyond the invoker, so the
-  // ephemeral reply carries it instead.
-  const send = interaction.channel?.send?.bind(interaction.channel);
-  if (!send) {
-    await interaction.editReply(reply);
-    return;
+    // The translation belongs in the channel, where the people it is for can read
+    // it. With nowhere to post it there is no audience beyond the invoker, so the
+    // ephemeral reply carries it instead.
+    const send = interaction.channel?.send?.bind(interaction.channel);
+    if (!send) {
+      await interaction.editReply(reply);
+      return;
+    }
+    await publishTranslation(ctx, {
+      sourceId,
+      target: outcome.target,
+      source: source ?? AUTO_SOURCE,
+      post: () => send({ ...reply, ...postOptionsFor(interaction.channel) }),
+    });
+    await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
+  } finally {
+    thinking.stop();
   }
-  await publishTranslation(ctx, {
-    sourceId,
-    target: outcome.target,
-    source: source ?? AUTO_SOURCE,
-    post: () => send({ ...reply, ...postOptionsFor(interaction.channel) }),
-  });
-  await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
 }
 
 export interface TranslateAutocompleteInteraction {

@@ -1,8 +1,14 @@
 import { MessageFlags } from "discord.js";
 
-/** The slice of a channel that decides how loudly a post there should land. */
+/** The slice of a channel a translation is announced in and lands in. */
 export interface PostChannel {
   isThread(): boolean;
+  /**
+   * Absent on the one channel kind that cannot be typed in (a partial group DM,
+   * which omits it), so it is optional exactly like `send` on the surfaces that
+   * carry one. See `showThinking()` in `typing.ts`.
+   */
+  sendTyping?(): Promise<void>;
 }
 
 /** Extra `send`/`reply` options a post carries on top of its payload. */

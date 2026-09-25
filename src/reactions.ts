@@ -13,6 +13,7 @@ import {
 import { sourceIdForMessage } from "./sourceId.js";
 import { postOptionsFor, type PostChannel, type PostOptions } from "./threads.js";
 import { AUTO_SOURCE, translateWithCache } from "./translate.js";
+import { showThinking } from "./typing.js";
 
 /** The slice of `MessageReaction` every reaction on the message is read through. */
 export interface ReactionSummary {
@@ -135,17 +136,25 @@ async function translateForFlag(
     return;
   }
 
-  const outcome = await translateWithCache(ctx, { sourceId, text, target });
-  await publishTranslation(ctx, {
-    sourceId,
-    target: outcome.target,
-    source: AUTO_SOURCE,
-    post: () =>
-      replyQuietly(
-        message,
-        buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
-      ),
-  });
+  // From here on something is owed to the channel, so it is shown the bot
+  // working. Stopped in a `finally` because a backend failure is answered by a
+  // DM one frame up, and the bot must not still look busy while that goes out.
+  const thinking = showThinking(ctx.log, message.channel);
+  try {
+    const outcome = await translateWithCache(ctx, { sourceId, text, target });
+    await publishTranslation(ctx, {
+      sourceId,
+      target: outcome.target,
+      source: AUTO_SOURCE,
+      post: () =>
+        replyQuietly(
+          message,
+          buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
+        ),
+    });
+  } finally {
+    thinking.stop();
+  }
 }
 
 /**

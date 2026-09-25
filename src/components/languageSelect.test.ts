@@ -8,6 +8,7 @@ import {
   lastPostFlags,
   lastPostPayload,
   lastReplyDescription,
+  typedBeforePosting,
   makeSelectInteraction,
 } from "../fixtures/interaction.fixture.js";
 import { frenchMessages } from "../fixtures/messages.fixture.js";
@@ -33,6 +34,8 @@ describe("handleLanguageSelect", () => {
     expect(interaction.calls[0]).toEqual({ method: "deferReply", payload: { flags: MessageFlags.Ephemeral } });
     expect(lastPostDescription(interaction)).toBe("[de] hola");
     expect(lastReplyDescription(interaction)).toBe("Posted the translation in the channel.");
+    // The invoker sees the defer; the channel sees the bot working.
+    expect(typedBeforePosting(interaction)).toBe(true);
     expect(ctx.backend.translateCalls).toEqual([{ text: "hola", source: "auto", target: "de" }]);
   });
 

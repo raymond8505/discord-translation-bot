@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BackendError } from "./backends/index.js";
 import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
-import { MESSAGE_ID, SPANISH_TEXT, lastPostFlags, lastReplyDescription, lastReplyPayload } from "./fixtures/interaction.fixture.js";
+import { MESSAGE_ID, SPANISH_TEXT, lastPostFlags, lastPostPayload, lastReplyDescription, lastReplyPayload, typedBeforePosting, typingCount } from "./fixtures/interaction.fixture.js";
 import { lastDmDescription } from "./fixtures/dm.fixture.js";
 import { BOT_USER_ID, makeMentionMessage } from "./fixtures/message.fixture.js";
 import { frenchMessages } from "./fixtures/messages.fixture.js";
@@ -21,6 +21,40 @@ describe("handleMentionMessage", () => {
     const payload = lastReplyPayload(message) as { allowedMentions?: { repliedUser: boolean } } | undefined;
     expect(payload?.allowedMentions).toEqual({ repliedUser: false });
     expect(message.hasOptions[0]).toEqual({ ignoreEveryone: true, ignoreRoles: true, ignoreRepliedUser: true });
+  });
+
+  it("shows the channel the bot working before the translation lands", async () => {
+    const ctx = makeContext();
+    const message = makeMentionMessage();
+
+    await handleMentionMessage(ctx, message);
+
+    // This trigger has no interaction token, so the typing indicator is the only
+    // sign anyone gets between the mention and the post.
+    expect(typedBeforePosting(message)).toBe(true);
+  });
+
+  it("does not look busy over a refusal that never reaches the backend", async () => {
+    const ctx = makeContext();
+    const noParent = makeMentionMessage({ parent: null });
+    const noText = makeMentionMessage({ parent: { id: MESSAGE_ID, content: "  " } });
+
+    await handleMentionMessage(ctx, noParent);
+    await handleMentionMessage(ctx, noText);
+
+    expect(typingCount(noParent)).toBe(0);
+    expect(typingCount(noText)).toBe(0);
+  });
+
+  it("still posts where the bot may not type", async () => {
+    const ctx = makeContext();
+    const message = makeMentionMessage({ typingFails: true });
+
+    await handleMentionMessage(ctx, message);
+
+    // Typing is a courtesy; losing it must not cost the translation.
+    expect(lastReplyDescription(message)).toBe(`[en] ${SPANISH_TEXT}`);
+    expect(ctx.log.entries.some((e) => e.level === "warn")).toBe(true);
   });
 
   it("records the post against the message it translated, not the mention", async () => {
@@ -144,7 +178,10 @@ describe("handleMentionMessage", () => {
     await expect(handleMentionMessage(ctx, message)).resolves.toBeUndefined();
 
     expect(lastDmDescription(message.author)).toMatch(/still starting up/);
-    expect(message.calls).toEqual([]);
+    // The channel was shown the bot working and then nothing landed in it: the
+    // refusal is the author's alone.
+    expect(typingCount(message)).toBe(1);
+    expect(lastPostPayload(message)).toBeUndefined();
     expect(ctx.log.entries.some((e) => e.level === "warn")).toBe(true);
   });
 

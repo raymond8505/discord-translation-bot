@@ -67,6 +67,34 @@ the mention and reaction triggers through their `replyQuietly()`. The structural
 and the edit refresh (`src/messages.ts`) — an edit fires no notification, and a post edited later
 keeps the flag it was created with.
 
+## The channel sees the bot working
+
+Every trigger calls `showThinking()` (`src/typing.ts`) the moment it commits to translating, and
+stops it in a `finally` around the translate-and-publish. Discord's typing indicator is what a
+person composing a message produces, and it is the only feedback that reaches the *channel*: the
+mention and flag-reaction triggers have no interaction token at all, and an interaction's deferred
+"thinking" state is ephemeral — the invoker sees it, nobody else does, and the translation is
+landing in the channel.
+
+The indicator **expires after 10 s**
+([Trigger Typing Indicator](https://discord.com/developers/docs/resources/channel#trigger-typing-indicator)),
+which is shorter than the backend's own 30 s translate timeout, so the signal re-fires every 8 s and
+caps itself at 30 s. The cap is what stops a request that never settles leaving the bot typing at an
+empty channel forever; the client clears the indicator by itself once the post lands.
+
+It starts **after** the cheap refusals — no reply reference, no text, an unsupported flag, over
+budget — so the bot never looks busy over something it is about to decline. It is never awaited and
+never throws: the bot may lack Send Messages in the channel, and a courtesy must not cost a
+translation the backend can still deliver. A failure logs **one** warning and gives up refreshing,
+because whatever denies the first call denies every later one.
+
+**Not applied to** the edit refresh (`src/invalidation.ts` / `src/messages.ts`): nobody asked for
+it and nobody is waiting on it.
+
+`PostChannel` (`src/threads.ts`) carries `sendTyping?()` alongside `isThread()`. It is optional for
+the same reason `send` is: a partial group DM omits it, and a channel the bot cannot see is null —
+either way `showThinking()` returns an inert signal and the caller needs no branch of its own.
+
 ## Refusals are private, translations are public
 
 Only an **interaction** can answer ephemerally. The mention trigger and the flag reaction have no

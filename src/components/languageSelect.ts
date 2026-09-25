@@ -6,6 +6,7 @@ import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../r
 import { isMessageSourceId } from "../sourceId.js";
 import { postOptionsFor, type PostChannel, type PostOptions } from "../threads.js";
 import { AUTO_SOURCE, translateWithCache } from "../translate.js";
+import { showThinking } from "../typing.js";
 import { AUTO_VALUE, parseSelectCustomId } from "./customId.js";
 
 /** The slice of `StringSelectMenuInteraction` the handler touches. */
@@ -74,29 +75,36 @@ export async function handleLanguageSelect(
 
   const supported = await ctx.languages.get();
   const forced = source === AUTO_VALUE ? undefined : source;
-  const outcome = await translateWithCache(ctx, { sourceId: parsed.sourceId, text, target, source: forced });
-  const reply = buildTranslationReply({
-    ...outcome,
-    sourceId: parsed.sourceId,
-    source: forced ?? AUTO_SOURCE,
-    supported,
-    tr,
-  });
+  // The defer's "thinking" state is ephemeral, so only the clicker has any sign
+  // that this is under way — and the new post is going to land in the channel.
+  const thinking = showThinking(ctx.log, interaction.channel);
+  try {
+    const outcome = await translateWithCache(ctx, { sourceId: parsed.sourceId, text, target, source: forced });
+    const reply = buildTranslationReply({
+      ...outcome,
+      sourceId: parsed.sourceId,
+      source: forced ?? AUTO_SOURCE,
+      supported,
+      tr,
+    });
 
-  // Unpostable channels get here only when `resolveSourceText` found the text in
-  // the cache, so the ephemeral reply is the last place left to put the result.
-  const send = interaction.channel?.send?.bind(interaction.channel);
-  if (!send) {
-    await interaction.editReply(reply);
-    return;
+    // Unpostable channels get here only when `resolveSourceText` found the text in
+    // the cache, so the ephemeral reply is the last place left to put the result.
+    const send = interaction.channel?.send?.bind(interaction.channel);
+    if (!send) {
+      await interaction.editReply(reply);
+      return;
+    }
+    await publishTranslation(ctx, {
+      sourceId: parsed.sourceId,
+      target: outcome.target,
+      source: forced ?? AUTO_SOURCE,
+      post: () => send({ ...reply, ...postOptionsFor(interaction.channel) }),
+    });
+    await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
+  } finally {
+    thinking.stop();
   }
-  await publishTranslation(ctx, {
-    sourceId: parsed.sourceId,
-    target: outcome.target,
-    source: forced ?? AUTO_SOURCE,
-    post: () => send({ ...reply, ...postOptionsFor(interaction.channel) }),
-  });
-  await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
 }
 
 async function resolveSourceText(

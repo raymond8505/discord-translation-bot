@@ -2,7 +2,7 @@ import type { MessageMentionsHasOptions } from "discord.js";
 import type { MentionMessage } from "../mentions.js";
 import type { ReplyPayload } from "../reply.js";
 import type { ResponseLog } from "./interaction.fixture.js";
-import { GUILD_ID, MESSAGE_ID, SPANISH_TEXT, USER_ID } from "./interaction.fixture.js";
+import { GUILD_ID, MESSAGE_ID, makeSendTyping, SPANISH_TEXT, USER_ID } from "./interaction.fixture.js";
 import { makeRecipient, type FakeRecipient } from "./dm.fixture.js";
 import { makePostedMessages } from "./post.fixture.js";
 
@@ -29,6 +29,12 @@ export interface MentionMessageOptions {
   dmsClosed?: boolean;
   /** `null` models a DM, where there is no guild budget to spend. */
   guildId?: string | null;
+  /**
+   * `sendTyping` rejects, as it does without Send Messages. Only this trigger
+   * carries it: what the failure costs a handler is the same on all five, and
+   * `typing.test.ts` owns how the signal itself behaves.
+   */
+  typingFails?: boolean;
 }
 
 export interface FakeMentionMessage extends MentionMessage, ResponseLog {
@@ -52,7 +58,10 @@ export function makeMentionMessage(options: MentionMessageOptions = {}): FakeMen
     guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     guild: { preferredLocale: options.preferredLocale ?? "en-US" },
     reference: parent ? { messageId: parent.id } : null,
-    channel: { isThread: () => options.inThread ?? false },
+    channel: {
+      isThread: () => options.inThread ?? false,
+      sendTyping: makeSendTyping(calls, options.typingFails),
+    },
     mentions: {
       has: (userId, opts) => {
         if (opts) hasOptions.push(opts);

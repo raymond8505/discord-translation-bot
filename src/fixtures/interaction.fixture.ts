@@ -26,6 +26,20 @@ function makeSend(calls: ResponseLog["calls"]): (payload: ReplyPayload) => Promi
   };
 }
 
+/**
+ * `channel.sendTyping`: the bot showing the channel it is working. Recorded in
+ * the same log as the posts, so a test can assert it came first.
+ */
+export function makeSendTyping(
+  calls: ResponseLog["calls"],
+  failing = false,
+): () => Promise<void> {
+  return async () => {
+    calls.push({ method: "sendTyping" });
+    if (failing) throw new Error("Missing Permissions");
+  };
+}
+
 /** `targetMessage.reply`: the context menu's public post, quiet like the other triggers. */
 function makeReply(
   calls: ResponseLog["calls"],
@@ -69,7 +83,12 @@ export function makeChatInputInteraction(
     options: { getString: (name) => values[name] ?? null },
     channel: options.withoutChannel
       ? null
-      : { id: CHANNEL_ID, send: makeSend(calls), isThread: () => options.inThread ?? false },
+      : {
+          id: CHANNEL_ID,
+          send: makeSend(calls),
+          sendTyping: makeSendTyping(calls),
+          isThread: () => options.inThread ?? false,
+        },
     async deferReply(payload) {
       calls.push({ method: "deferReply", payload });
     },
@@ -131,7 +150,7 @@ export function makeMessageContextInteraction(
     targetMessage: {
       id: options.id ?? MESSAGE_ID,
       content: options.content ?? SPANISH_TEXT,
-      channel: { isThread: () => options.inThread ?? false },
+      channel: { isThread: () => options.inThread ?? false, sendTyping: makeSendTyping(calls) },
       reply: makeReply(calls),
     },
     async deferReply(payload) {
@@ -172,6 +191,7 @@ export function makeSelectInteraction(options: SelectOptions): LanguageSelectInt
       ? null
       : {
           isThread: () => options.inThread ?? false,
+          sendTyping: makeSendTyping(calls),
           messages: {
             async fetch(id) {
               calls.push({ method: "fetch", payload: id });
@@ -215,4 +235,16 @@ export function lastPostDescription(log: ResponseLog): string | undefined {
 /** The flags on the last public post; `SuppressNotifications` when it went to a thread. */
 export function lastPostFlags(log: ResponseLog): number | undefined {
   return (lastPostPayload(log) as (ReplyPayload & { flags?: number }) | undefined)?.flags;
+}
+
+/** How many times the bot showed the channel it was working. */
+export function typingCount(log: ResponseLog): number {
+  return log.calls.filter((c) => c.method === "sendTyping").length;
+}
+
+/** Whether the channel was shown the bot working *before* the translation landed. */
+export function typedBeforePosting(log: ResponseLog): boolean {
+  const typed = log.calls.findIndex((c) => c.method === "sendTyping");
+  const posted = log.calls.findIndex((c) => c.method === "send" || c.method === "reply");
+  return typed !== -1 && posted !== -1 && typed < posted;
 }

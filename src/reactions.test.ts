@@ -4,7 +4,7 @@ import { BackendError } from "./backends/index.js";
 import { makeFakeBackend } from "./fixtures/backend.fixture.js";
 import { alwaysLimited, makeContext } from "./fixtures/context.fixture.js";
 import { lastDmDescription } from "./fixtures/dm.fixture.js";
-import { lastPostFlags, lastReplyDescription, lastReplyPayload, MESSAGE_ID, SPANISH_TEXT } from "./fixtures/interaction.fixture.js";
+import { lastPostFlags, lastPostPayload, lastReplyDescription, lastReplyPayload, MESSAGE_ID, SPANISH_TEXT, typedBeforePosting, typingCount } from "./fixtures/interaction.fixture.js";
 import { BOT_USER_ID } from "./fixtures/message.fixture.js";
 import { frenchMessages } from "./fixtures/messages.fixture.js";
 import { FLAGS, makeFlagReaction, makeReactingUser, NON_FLAGS } from "./fixtures/reaction.fixture.js";
@@ -26,6 +26,29 @@ describe("handleFlagReaction", () => {
     expect(lastReplyDescription(reaction)).toBe(`[de] ${SPANISH_TEXT}`);
     expect(allowedMentions(reaction)).toEqual({ repliedUser: false });
     expect(lastReplyPayload(reaction)?.components.length).toBeGreaterThan(0);
+  });
+
+  it("shows the channel the bot working before the translation lands", async () => {
+    const ctx = makeContext();
+    const reaction = makeFlagReaction({ emoji: FLAGS.germany });
+
+    await handleFlagReaction(ctx, reaction, makeReactingUser());
+
+    // A reaction has no interaction token, so the typing indicator is the only
+    // sign anyone gets between the flag and the post.
+    expect(typedBeforePosting(reaction)).toBe(true);
+  });
+
+  it("does not look busy over a refusal that never reaches the backend", async () => {
+    const ctx = makeContext();
+    const unsupported = makeFlagReaction({ emoji: FLAGS.cambodia });
+    const noText = makeFlagReaction({ emoji: FLAGS.germany, content: "  " });
+
+    await handleFlagReaction(ctx, unsupported, makeReactingUser());
+    await handleFlagReaction(ctx, noText, makeReactingUser());
+
+    expect(typingCount(unsupported)).toBe(0);
+    expect(typingCount(noText)).toBe(0);
   });
 
   it("records the post so an edit to the message reaches it", async () => {
@@ -177,7 +200,10 @@ describe("handleFlagReaction", () => {
     await handleFlagReaction(ctx, reaction, user);
 
     expect(lastDmDescription(user)).toMatch(/still starting up/);
-    expect(reaction.calls).toEqual([]);
+    // The channel was shown the bot working and then nothing landed in it: the
+    // refusal is the reactor's alone.
+    expect(typingCount(reaction)).toBe(1);
+    expect(lastPostPayload(reaction)).toBeUndefined();
     expect(ctx.log.entries.map((entry) => entry.level)).toContain("warn");
     expect(ctx.log.entries.some((entry) => entry.level === "error")).toBe(false);
   });

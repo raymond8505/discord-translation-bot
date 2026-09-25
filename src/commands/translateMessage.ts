@@ -9,6 +9,7 @@ import { buildNoticeReply, buildTranslationReply, type ReplyPayload } from "../r
 import { sourceIdForMessage } from "../sourceId.js";
 import { postOptionsFor, type PostChannel, type PostOptions } from "../threads.js";
 import { AUTO_SOURCE, translateWithCache } from "../translate.js";
+import { showThinking } from "../typing.js";
 
 /** The default name is what `interaction.commandName` carries whatever the user's locale. */
 export const TRANSLATE_MESSAGE_COMMAND_NAME = staticI18n.message("en", "cmd.translateMessage.name");
@@ -65,19 +66,26 @@ export async function handleTranslateMessage(
   const supported = await ctx.languages.get();
   const target = resolveTarget(interaction.locale, supported);
   const sourceId = sourceIdForMessage(id);
-  const outcome = await translateWithCache(ctx, { sourceId, text: content, target });
-  await publishTranslation(ctx, {
-    sourceId,
-    target: outcome.target,
-    source: AUTO_SOURCE,
-    // Quiet, like the other two message-driven triggers: the author wrote the
-    // message, they didn't ask for this.
-    post: () =>
-      targetMessage.reply({
-        ...buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
-        allowedMentions: { repliedUser: false },
-        ...postOptionsFor(targetMessage.channel),
-      }),
-  });
-  await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
+  // The defer's "thinking" state is ephemeral, so only the invoker has any sign
+  // that this is under way — and the translation is going to land in the channel.
+  const thinking = showThinking(ctx.log, targetMessage.channel);
+  try {
+    const outcome = await translateWithCache(ctx, { sourceId, text: content, target });
+    await publishTranslation(ctx, {
+      sourceId,
+      target: outcome.target,
+      source: AUTO_SOURCE,
+      // Quiet, like the other two message-driven triggers: the author wrote the
+      // message, they didn't ask for this.
+      post: () =>
+        targetMessage.reply({
+          ...buildTranslationReply({ ...outcome, sourceId, source: AUTO_SOURCE, supported, tr }),
+          allowedMentions: { repliedUser: false },
+          ...postOptionsFor(targetMessage.channel),
+        }),
+    });
+    await interaction.editReply(buildNoticeReply(tr.t("reply.posted")));
+  } finally {
+    thinking.stop();
+  }
 }

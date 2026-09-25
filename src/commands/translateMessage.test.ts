@@ -9,6 +9,7 @@ import {
   lastPostDescription,
   lastPostPayload,
   lastReplyDescription,
+  typedBeforePosting,
   makeMessageContextInteraction,
 } from "../fixtures/interaction.fixture.js";
 import { frenchMessages } from "../fixtures/messages.fixture.js";
@@ -31,6 +32,8 @@ describe("handleTranslateMessage", () => {
     expect(interaction.calls[0]).toEqual({ method: "deferReply", payload: { flags: MessageFlags.Ephemeral } });
     expect(ctx.backend.translateCalls).toEqual([{ text: SPANISH_TEXT, source: "auto", target: "fr" }]);
     expect(lastPostDescription(interaction)).toBe(`[fr] ${SPANISH_TEXT}`);
+    // The invoker sees the defer; the channel sees the bot working.
+    expect(typedBeforePosting(interaction)).toBe(true);
     // The author wrote the message; they did not ask to be pinged about it.
     expect(lastPostPayload(interaction)).toMatchObject({ allowedMentions: { repliedUser: false } });
   });

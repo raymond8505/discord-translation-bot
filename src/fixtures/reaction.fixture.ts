@@ -1,7 +1,7 @@
 import type { FlagReaction, ReactedMessage, ReactingUser, ReactionSummary } from "../reactions.js";
 import type { ReplyPayload } from "../reply.js";
 import { makeRecipient, type FakeRecipient, type RecipientOptions } from "./dm.fixture.js";
-import { GUILD_ID, MESSAGE_ID, SPANISH_TEXT, USER_ID, type ResponseLog } from "./interaction.fixture.js";
+import { GUILD_ID, MESSAGE_ID, makeSendTyping, SPANISH_TEXT, USER_ID, type ResponseLog } from "./interaction.fixture.js";
 import { BOT_USER_ID } from "./message.fixture.js";
 import { makePostedMessages } from "./post.fixture.js";
 
@@ -99,7 +99,7 @@ export function makeFlagReaction(options: FlagReactionOptions = {}): FakeFlagRea
     guildId: options.guildId === undefined ? GUILD_ID : options.guildId,
     guild: { preferredLocale: options.preferredLocale ?? "en-US" },
     reactions: { cache },
-    channel: { isThread: () => options.inThread ?? false },
+    channel: { isThread: () => options.inThread ?? false, sendTyping: makeSendTyping(calls) },
     async fetch() {
       fetchCalls.push("message");
       if (options.unreadable) throw new Error("Unknown Message");
